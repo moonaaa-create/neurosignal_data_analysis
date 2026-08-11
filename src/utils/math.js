@@ -76,7 +76,7 @@ export function calculateFriendshipScore(pGamma, rAvoidance, wSync = 1.0, wFaa =
 // =========================================
 
 // Module 01 & 04: Filter Outlier Spikes (Z-Score Thresholding for EOG/EMG)
-export function filterEOGOutliers(arr, zThreshold = 2.5) {
+export function filterEOGOutliers(arr, zThreshold = 2.0) {
   if (arr.length === 0) return { filtered: [], outlierCount: 0 };
   const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
   const std = Math.sqrt(arr.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / arr.length) || 1;

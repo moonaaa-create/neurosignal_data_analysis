@@ -222,14 +222,18 @@ function App() {
       processedGammaB = normalizeLog(processedGammaB);
     }
 
-    // Toggle 1: EOG Outlier Filtering
+    // Toggle 1: EOG Outlier Filtering (Eye blinks affect frontal lobes AF3/AF4)
     if (useEogFilter) {
-      processedGammaA = filterEOGOutliers(processedGammaA).filtered;
-      processedGammaB = filterEOGOutliers(processedGammaB).filtered;
       processedAF3A = filterEOGOutliers(processedAF3A).filtered;
       processedAF4A = filterEOGOutliers(processedAF4A).filtered;
       processedAF3B = filterEOGOutliers(processedAF3B).filtered;
       processedAF4B = filterEOGOutliers(processedAF4B).filtered;
+    }
+
+    // Toggle 2: EMG Outlier Filtering (Muscle noise affects high-freq Gamma)
+    if (useEmgFilter) {
+      processedGammaA = filterEOGOutliers(processedGammaA).filtered;
+      processedGammaB = filterEOGOutliers(processedGammaB).filtered;
     }
 
     // Toggle 3: Time-Lag Correlation vs Standard
