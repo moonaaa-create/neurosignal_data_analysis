@@ -118,6 +118,7 @@ function App() {
 
   const [activeTab, setActiveTab] = useState('REPORT'); // 'REPORT', 'PROTOCOL', 'ADVANCED_PROTOCOL'
   const [radarSubject, setRadarSubject] = useState('A'); // 'A', 'B', 'BOTH'
+  const [reportTarget, setReportTarget] = useState('BOTH'); // 'A', 'B', 'BOTH'
 
   const [results, setResults] = useState(null);
   const [advancedResults, setAdvancedResults] = useState(null);
@@ -442,9 +443,20 @@ function App() {
     plugins: { legend: { display: radarSubject === 'BOTH' } }, maintainAspectRatio: false
   };
 
-  const avgStress = results ? Math.round(((results.emotionsA['stress (스트레스)'] || 0) + (results.emotionsB['stress (스트레스)'] || 0)) / 2) : 0;
-  const avgEngagement = results ? Math.round(((results.emotionsA['engagement (몰입도)'] || 0) + (results.emotionsB['engagement (몰입도)'] || 0)) / 2) : 0;
-  const avgInterest = results ? Math.round(((results.emotionsA['interest (흥미도)'] || 0) + (results.emotionsB['interest (흥미도)'] || 0)) / 2) : 0;
+  const getTargetScore = (key) => {
+    if (!results) return 0;
+    if (reportTarget === 'A') return results.emotionsA[key] || 0;
+    if (reportTarget === 'B') return results.emotionsB[key] || 0;
+    return Math.round(((results.emotionsA[key] || 0) + (results.emotionsB[key] || 0)) / 2);
+  };
+
+  const targetStress = getTargetScore('stress (스트레스)');
+  const targetEngagement = getTargetScore('engagement (몰입도)');
+  const targetInterest = getTargetScore('interest (흥미도)');
+  
+  let targetName = '평균';
+  if (reportTarget === 'A') targetName = `${nameA}님`;
+  else if (reportTarget === 'B') targetName = `${nameB}님`;
 
   return (
     <div className="app-container">
@@ -522,10 +534,22 @@ function App() {
                 프리미엄 리포트 생성
               </button>
               {results && (
-                <button className="btn btn-secondary" onClick={() => window.print()}>
-                  <Printer size={20} />
-                  PDF 내보내기
-                </button>
+                <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                  <select 
+                    className="btn btn-secondary" 
+                    value={reportTarget} 
+                    onChange={e => setReportTarget(e.target.value)}
+                    style={{ appearance: 'auto', paddingRight: '2rem' }}
+                  >
+                    <option value="BOTH">공통 (두 사람 모두)</option>
+                    <option value="A">{nameA}님 맞춤형</option>
+                    <option value="B">{nameB}님 맞춤형</option>
+                  </select>
+                  <button className="btn btn-secondary" onClick={() => window.print()}>
+                    <Printer size={20} />
+                    PDF 내보내기
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -581,7 +605,14 @@ function App() {
                 <div className="report-header">
                   <div>
                     <div className="brand-title">NeuroSignal Project</div>
-                    <h1 className="report-title">뇌파 동기화 <br/>종합 분석 결과</h1>
+                    <h1 className="report-title">
+                      뇌파 동기화 <br/>종합 분석 결과
+                    </h1>
+                    {reportTarget !== 'BOTH' && (
+                      <div style={{ marginTop: '0.5rem', fontSize: '1.2rem', color: 'var(--accent-teal)', fontWeight: '600' }}>
+                        - {targetName} 맞춤형 리포트 -
+                      </div>
+                    )}
                   </div>
                   <div className="report-meta">
                     <div className="date-badge">Analysis Date: {results.date}</div>
@@ -698,7 +729,9 @@ function App() {
 
                   {/* Executive Summary & Insights Panel (4 Cards) */}
                   <div className="insights-panel">
-                    <h3 className="chart-title" style={{ marginBottom: '1.5rem' }}>NeuroSignal 핵심 요약 & 솔루션</h3>
+                    <h3 className="chart-title" style={{ marginBottom: '1.5rem' }}>
+                      {reportTarget === 'BOTH' ? 'NeuroSignal 핵심 요약 & 솔루션' : `${targetName} 맞춤형 핵심 요약 & 솔루션`}
+                    </h3>
                     <div className="insights-grid">
                       <div className="insight-card">
                         <div className="insight-icon">🤝</div>
@@ -712,7 +745,7 @@ function App() {
                         <div className="insight-icon">🧘</div>
                         <div>
                           <h4 className="insight-title">스트레스 (Stress) 케어 솔루션</h4>
-                          <p className="insight-body">현재 평균 스트레스 지수는 <strong>{avgStress}점</strong>입니다. {avgStress < 40 ? '대화 중 긴장도가 낮아 매우 편안한 환경입니다.' : '일상적인 가벼운 주제로 분위기를 환기해 보세요.'}</p>
+                          <p className="insight-body">현재 {targetName}의 스트레스 지수는 <strong>{targetStress}점</strong>입니다. {targetStress < 40 ? '대화 중 긴장도가 낮아 매우 편안한 상태입니다.' : '스트레스 수치가 다소 높습니다. 가벼운 주제로 분위기를 환기해 보세요.'}</p>
                         </div>
                       </div>
 
@@ -720,7 +753,7 @@ function App() {
                         <div className="insight-icon">🔥</div>
                         <div>
                           <h4 className="insight-title">몰입도 (Engagement) 강화 솔루션</h4>
-                          <p className="insight-body">대화 참여 몰입도는 평균 <strong>{avgEngagement}점</strong>을 기록했습니다.</p>
+                          <p className="insight-body">{targetName}의 대화 참여 몰입도는 <strong>{targetEngagement}점</strong>을 기록했습니다. {targetEngagement >= 60 ? '대화에 깊게 빠져들어 있습니다.' : '주변 환경의 산만함을 줄여 집중도를 높이는 것이 좋습니다.'}</p>
                         </div>
                       </div>
 
@@ -728,7 +761,7 @@ function App() {
                         <div className="insight-icon">✨</div>
                         <div>
                           <h4 className="insight-title">흥미도 (Interest) 피드백</h4>
-                          <p className="insight-body">상대방에 대한 흥미도 수치는 평균 <strong>{avgInterest}점</strong>입니다.</p>
+                          <p className="insight-body">상대방 및 대화 주제에 대한 {targetName}의 흥미도 수치는 <strong>{targetInterest}점</strong>입니다.</p>
                         </div>
                       </div>
                     </div>
