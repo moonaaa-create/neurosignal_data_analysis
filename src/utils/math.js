@@ -95,6 +95,34 @@ export function filterEOGOutliers(arr, zThreshold = 2.5) {
 }
 
 // Module 03: Time-Lagged Cross Correlation (Emotional Echo Detection)
+export function timeLaggedPearsonCorrelation(x, y, maxLag = 3) {
+  if (x.length === 0 || y.length === 0) return { maxCorr: 0, optimalLag: 0 };
+  let bestCorr = -1;
+  let bestLag = 0;
+  
+  for (let lag = -maxLag; lag <= maxLag; lag++) {
+    let subX = [], subY = [];
+    if (lag >= 0) {
+      subX = x.slice(0, x.length - lag);
+      subY = y.slice(lag);
+    } else {
+      const absLag = Math.abs(lag);
+      subX = x.slice(absLag);
+      subY = y.slice(0, y.length - absLag);
+    }
+    
+    if (subX.length > 5) {
+      const corr = pearsonCorrelation(subX, subY);
+      if (corr > bestCorr) {
+        bestCorr = corr;
+        bestLag = lag;
+      }
+    }
+  }
+  
+  return { maxCorr: bestCorr, optimalLag: bestLag };
+}
+
 export function timeLaggedSpearmanCorrelation(x, y, maxLag = 3) {
   if (x.length === 0 || y.length === 0) return { maxCorr: 0, optimalLag: 0 };
   let bestCorr = -1;

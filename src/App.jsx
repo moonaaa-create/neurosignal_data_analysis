@@ -6,8 +6,8 @@ import {
   Cpu, Layers, Eye, RefreshCw, BarChart3, Check, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { 
-  spearmanCorrelation, calculateRAvoidance, calculateFriendshipScore, 
-  filterEOGOutliers, timeLaggedSpearmanCorrelation, runAdvancedComparisonPipeline,
+  pearsonCorrelation, calculateRAvoidance, calculateFriendshipScore, 
+  filterEOGOutliers, timeLaggedPearsonCorrelation, runAdvancedComparisonPipeline,
   normalizeLog
 } from './utils/math';
 import {
@@ -236,11 +236,11 @@ function App() {
     let pGamma = 0;
     let detectedLag = 0;
     if (useTimeLag) {
-      const lagRes = timeLaggedSpearmanCorrelation(processedGammaA, processedGammaB, 3);
+      const lagRes = timeLaggedPearsonCorrelation(processedGammaA, processedGammaB, 3);
       pGamma = lagRes.maxCorr;
       detectedLag = lagRes.optimalLag;
     } else {
-      pGamma = spearmanCorrelation(processedGammaA, processedGammaB);
+      pGamma = pearsonCorrelation(processedGammaA, processedGammaB);
     }
 
     const rAvoidance = calculateRAvoidance(processedAF3A, processedAF4A, processedAF3B, processedAF4B);
