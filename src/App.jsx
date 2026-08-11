@@ -498,47 +498,6 @@ function App() {
               </div>
             </div>
 
-            {/* REAL-TIME EEG PROCESSING TOGGLES */}
-            <div className="processing-toggles-section">
-              <div className="toggles-title">
-                <Sliders size={18} /> 🎛️ 뇌파 데이터 전처리 알고리즘 스위치 (클릭 시 점수 실시간 재산출)
-              </div>
-              <div className="processing-toggles-grid">
-                
-                <div className={`toggle-card ${useEogFilter ? 'active' : ''}`} onClick={() => setUseEogFilter(!useEogFilter)}>
-                  <div className="toggle-label-wrap">
-                    <Eye size={18} style={{ color: useEogFilter ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
-                    <span>EOG 눈 깜빡임 제거</span>
-                  </div>
-                  <div className="toggle-switch-pill" />
-                </div>
-
-                <div className={`toggle-card ${useEmgFilter ? 'active' : ''}`} onClick={() => setUseEmgFilter(!useEmgFilter)}>
-                  <div className="toggle-label-wrap">
-                    <Activity size={18} style={{ color: useEmgFilter ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
-                    <span>EMG 근육노이즈 정화</span>
-                  </div>
-                  <div className="toggle-switch-pill" />
-                </div>
-
-                <div className={`toggle-card ${useTimeLag ? 'active' : ''}`} onClick={() => setUseTimeLag(!useTimeLag)}>
-                  <div className="toggle-label-wrap">
-                    <RefreshCw size={18} style={{ color: useTimeLag ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
-                    <span>Time-Lag 반응지연 보정</span>
-                  </div>
-                  <div className="toggle-switch-pill" />
-                </div>
-
-                <div className={`toggle-card ${useLnNorm ? 'active' : ''}`} onClick={() => setUseLnNorm(!useLnNorm)}>
-                  <div className="toggle-label-wrap">
-                    <Layers size={18} style={{ color: useLnNorm ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
-                    <span>개인차 Ln 정규화</span>
-                  </div>
-                  <div className="toggle-switch-pill" />
-                </div>
-
-              </div>
-            </div>
 
             <div className="upload-grid">
               <div className={`upload-card ${fileA ? 'has-file' : ''}`}>
@@ -568,6 +527,48 @@ function App() {
                   PDF 내보내기
                 </button>
               )}
+            </div>
+          </div>
+
+          {/* REAL-TIME EEG PROCESSING TOGGLES (Moved outside of settings-panel) */}
+          <div className="processing-toggles-section no-print">
+            <div className="toggles-title">
+              <Sliders size={18} /> 🎛️ 뇌파 전처리 알고리즘 스위치
+            </div>
+            <div className="processing-toggles-grid">
+              
+              <div className={`toggle-card ${useEogFilter ? 'active' : ''}`} onClick={() => setUseEogFilter(!useEogFilter)}>
+                <div className="toggle-label-wrap">
+                  <Eye size={18} style={{ color: useEogFilter ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
+                  <span>EOG 눈 깜빡임 제거</span>
+                </div>
+                <div className="toggle-switch-pill" />
+              </div>
+
+              <div className={`toggle-card ${useEmgFilter ? 'active' : ''}`} onClick={() => setUseEmgFilter(!useEmgFilter)}>
+                <div className="toggle-label-wrap">
+                  <Activity size={18} style={{ color: useEmgFilter ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
+                  <span>EMG 근육노이즈 정화</span>
+                </div>
+                <div className="toggle-switch-pill" />
+              </div>
+
+              <div className={`toggle-card ${useTimeLag ? 'active' : ''}`} onClick={() => setUseTimeLag(!useTimeLag)}>
+                <div className="toggle-label-wrap">
+                  <RefreshCw size={18} style={{ color: useTimeLag ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
+                  <span>Time-Lag 반응지연 보정</span>
+                </div>
+                <div className="toggle-switch-pill" />
+              </div>
+
+              <div className={`toggle-card ${useLnNorm ? 'active' : ''}`} onClick={() => setUseLnNorm(!useLnNorm)}>
+                <div className="toggle-label-wrap">
+                  <Layers size={18} style={{ color: useLnNorm ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
+                  <span>개인차 Ln 정규화</span>
+                </div>
+                <div className="toggle-switch-pill" />
+              </div>
+
             </div>
           </div>
 
