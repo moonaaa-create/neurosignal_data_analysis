@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { 
   spearmanCorrelation, calculateRAvoidance, calculateFriendshipScore, 
-  filterEOGOutliers, timeLaggedSpearmanCorrelation, runAdvancedComparisonPipeline 
+  filterEOGOutliers, timeLaggedSpearmanCorrelation, runAdvancedComparisonPipeline,
+  normalizeLog
 } from './utils/math';
 import {
   Chart as ChartJS,
@@ -113,7 +114,7 @@ function App() {
   const [useEogFilter, setUseEogFilter] = useState(true);
   const [useEmgFilter, setUseEmgFilter] = useState(true);
   const [useTimeLag, setUseTimeLag] = useState(true);
-  const [useZScore, setUseZScore] = useState(true);
+  const [useLnNorm, setUseLnNorm] = useState(true);
 
   const [activeTab, setActiveTab] = useState('REPORT'); // 'REPORT', 'PROTOCOL', 'ADVANCED_PROTOCOL'
   const [radarSubject, setRadarSubject] = useState('A'); // 'A', 'B', 'BOTH'
@@ -135,7 +136,7 @@ function App() {
     if (dataA.length && dataB.length && results) {
       handleAnalyze();
     }
-  }, [useEogFilter, useEmgFilter, useTimeLag, useZScore]);
+  }, [useEogFilter, useEmgFilter, useTimeLag, useLnNorm]);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
@@ -214,6 +215,12 @@ function App() {
     let processedAF4A = [...arrAF4A];
     let processedAF3B = [...arrAF3B];
     let processedAF4B = [...arrAF4B];
+
+    // Toggle 4: Ln Normalization (Baseline correction)
+    if (useLnNorm) {
+      processedGammaA = normalizeLog(processedGammaA);
+      processedGammaB = normalizeLog(processedGammaB);
+    }
 
     // Toggle 1: EOG Outlier Filtering
     if (useEogFilter) {
@@ -518,10 +525,10 @@ function App() {
                   <div className="toggle-switch-pill" />
                 </div>
 
-                <div className={`toggle-card ${useZScore ? 'active' : ''}`} onClick={() => setUseZScore(!useZScore)}>
+                <div className={`toggle-card ${useLnNorm ? 'active' : ''}`} onClick={() => setUseLnNorm(!useLnNorm)}>
                   <div className="toggle-label-wrap">
-                    <Layers size={18} style={{ color: useZScore ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
-                    <span>개인차 Z-Score 정규화</span>
+                    <Layers size={18} style={{ color: useLnNorm ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
+                    <span>개인차 Ln 정규화</span>
                   </div>
                   <div className="toggle-switch-pill" />
                 </div>
@@ -576,7 +583,7 @@ function App() {
                     
                     {/* ACTIVE TOGGLES STATUS BADGE */}
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.8rem' }}>
-                      적용된 알고리즘: {useEogFilter ? 'EOG필터✅ ' : ''}{useEmgFilter ? 'EMG정화✅ ' : ''}{useTimeLag ? 'Time-Lag보정✅ ' : ''}{useZScore ? 'Z-Score✅' : ''}
+                      적용된 알고리즘: {useEogFilter ? 'EOG필터✅ ' : ''}{useEmgFilter ? 'EMG정화✅ ' : ''}{useTimeLag ? 'Time-Lag보정✅ ' : ''}{useLnNorm ? 'Ln정규화✅' : ''}
                     </div>
 
                     <div className="participant-info">

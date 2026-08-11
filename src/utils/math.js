@@ -123,12 +123,10 @@ export function timeLaggedSpearmanCorrelation(x, y, maxLag = 3) {
   return { maxCorr: bestCorr, optimalLag: bestLag };
 }
 
-// Module 05: Subject Baseline Z-Score Normalization
-export function normalizeZScore(arr) {
+// Module 05: Subject Baseline Log Normalization
+export function normalizeLog(arr) {
   if (arr.length === 0) return arr;
-  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-  const std = Math.sqrt(arr.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / arr.length) || 1;
-  return arr.map(v => (v - mean) / std);
+  return arr.map(v => (v > 0 ? Math.log(v) : 0));
 }
 
 // Complete Advanced Comparison Pipeline
