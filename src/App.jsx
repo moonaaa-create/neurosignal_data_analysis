@@ -157,11 +157,11 @@ function App() {
   
   const [skipInitial, setSkipInitial] = useState(true);
 
-  // TRI-REGION WEIGHTS (Pz, T7, T8)
-  const [wPz, setWPz] = useState(0.40);
-  const [wT7, setWT7] = useState(0.30);
-  const [wT8, setWT8] = useState(0.30);
-  const [activePreset, setActivePreset] = useState('BALANCED');
+  // TRI-REGION WEIGHTS (Pz, T7, T8) - Default 6:2:2 based on Research Paper Standards
+  const [wPz, setWPz] = useState(0.60);
+  const [wT7, setWT7] = useState(0.20);
+  const [wT8, setWT8] = useState(0.20);
+  const [activePreset, setActivePreset] = useState('PAPER_STANDARD');
 
   // ALGORITHM HYPERPARAMETERS
   const [wSync, setWSync] = useState(0.80);
@@ -210,10 +210,10 @@ function App() {
 
   const applyPreset = (preset) => {
     setActivePreset(preset);
-    if (preset === 'BALANCED') {
-      setWPz(0.40); setWT7(0.30); setWT8(0.30);
-    } else if (preset === 'COGNITIVE') {
+    if (preset === 'PAPER_STANDARD' || preset === 'COGNITIVE') {
       setWPz(0.60); setWT7(0.20); setWT8(0.20);
+    } else if (preset === 'BALANCED') {
+      setWPz(0.40); setWT7(0.30); setWT8(0.30);
     } else if (preset === 'SOCIAL') {
       setWPz(0.20); setWT7(0.40); setWT8(0.40);
     }
@@ -832,16 +832,16 @@ function App() {
                 </div>
                 <div className="preset-buttons-group">
                   <button 
+                    className={`preset-btn ${activePreset === 'PAPER_STANDARD' || activePreset === 'COGNITIVE' ? 'active' : ''}`}
+                    onClick={() => applyPreset('PAPER_STANDARD')}
+                  >
+                    🎯 논문 표준 기준 (6:2:2) [기본값]
+                  </button>
+                  <button 
                     className={`preset-btn ${activePreset === 'BALANCED' ? 'active' : ''}`}
                     onClick={() => applyPreset('BALANCED')}
                   >
-                    🎯 균형 모드 (4:3:3)
-                  </button>
-                  <button 
-                    className={`preset-btn ${activePreset === 'COGNITIVE' ? 'active' : ''}`}
-                    onClick={() => applyPreset('COGNITIVE')}
-                  >
-                    💡 인지·몰입 중심 (6:2:2)
+                    ⚖️ 균형 분배 (4:3:3)
                   </button>
                   <button 
                     className={`preset-btn ${activePreset === 'SOCIAL' ? 'active' : ''}`}

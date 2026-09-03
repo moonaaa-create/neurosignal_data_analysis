@@ -75,11 +75,12 @@ export function calculateCosineSimilarity(vecA, vecB) {
  * @param {Array<number>} gammaPz - Parietal gamma series
  * @param {Array<number>} gammaT7 - Left temporal gamma series
  * @param {Array<number>} gammaT8 - Right temporal gamma series
- * @param {number} wPz - Weight for Pz (default: 0.40)
- * @param {number} wT7 - Weight for T7 (default: 0.30)
- * @param {number} wT8 - Weight for T8 (default: 0.30)
+ * @param {number} wPz - Weight for Pz (default: 0.60)
+ * @param {number} wT7 - Weight for T7 (default: 0.20)
+ * @param {number} wT8 - Weight for T8 (default: 0.20)
+ * @returns {Array<number>}
  */
-export function calculateWeightedGamma(gammaPz, gammaT7, gammaT8, wPz = 0.4, wT7 = 0.3, wT8 = 0.3) {
+export function calculateWeightedGamma(gammaPz, gammaT7, gammaT8, wPz = 0.6, wT7 = 0.2, wT8 = 0.2) {
   const len = Math.max(gammaPz?.length || 0, gammaT7?.length || 0, gammaT8?.length || 0);
   if (len === 0) return [];
 
@@ -251,7 +252,7 @@ export function calculateFriendshipScore(pGamma, rAvoidance, wSync = 1.0, wFaa =
 // ================================================================
 export function calculateImprovedSyncScore({
   channelCorrs = {}, // { rPz, rT7, rT8 }
-  channelWeights = { wPz: 0.4, wT7: 0.3, wT8: 0.3 },
+  channelWeights = { wPz: 0.6, wT7: 0.2, wT8: 0.2 },
   faaMultiplier = 1.0,
   rAvoidance = 0,
   rApproach = 0,
@@ -389,7 +390,7 @@ export function runTriRegionPipeline({
   pzA, t7A, t8A,
   pzB, t7B, t8B,
   af3A, af4A, af3B, af4B,
-  wPz = 0.4, wT7 = 0.3, wT8 = 0.3,
+  wPz = 0.6, wT7 = 0.2, wT8 = 0.2,
   wSync = 0.8, wFaa = 0.25, wEmotion = 0.2,
   emotionVecA = [], emotionVecB = []
 }) {
