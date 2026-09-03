@@ -100,7 +100,7 @@ function findNumericColumn(data, headers) {
   return headers[1] || headers[0];
 }
 
-function sampleData(arr, maxPoints = 120) {
+function sampleData(arr, maxPoints = 300) {
   if (!arr || arr.length <= maxPoints) return arr || [];
   const step = Math.ceil(arr.length / maxPoints);
   return arr.filter((_, i) => i % step === 0);
@@ -290,7 +290,7 @@ function App() {
 
     const startIndex = skipInitial ? Math.min(30, Math.floor(minLen * 0.1)) : 0;
 
-    for (let i = startIndex; i < minLen; i++) {
+    for (let i = 0; i < minLen; i++) {
       const pzA = customA[i][colPzA];
       const pzB = customB[i][colPzB];
 
@@ -354,7 +354,7 @@ function App() {
       matchedColumns
     } = eegData;
 
-    // 1. Process Raw Channels
+    // 1. Process Raw Channels (Full 300s series)
     let pPzA = [...arrPzA], pT7A = [...arrT7A], pT8A = [...arrT8A];
     let pPzB = [...arrPzB], pT7B = [...arrT7B], pT8B = [...arrT8B];
     let pAF3A = [...arrAF3A], pAF4A = [...arrAF4A];
@@ -384,25 +384,39 @@ function App() {
       pT8B = filterEOGOutliers(pT8B).filtered;
     }
 
-    // 2. Compute Tri-Region Weighted Average Gamma Time-Series
+    // 2. Compute Tri-Region Weighted Average Gamma Time-Series (Full 300s)
     const integratedGammaA = calculateWeightedGamma(pPzA, pT7A, pT8A, wPz, wT7, wT8);
     const integratedGammaB = calculateWeightedGamma(pPzB, pT7B, pT8B, wPz, wT7, wT8);
+
+    // Active segments for correlation analysis (skipping initial stabilization if enabled)
+    const activeIntA = integratedGammaA.slice(startIndex);
+    const activeIntB = integratedGammaB.slice(startIndex);
+    const activePzA = pPzA.slice(startIndex);
+    const activePzB = pPzB.slice(startIndex);
+    const activeT7A = pT7A.slice(startIndex);
+    const activeT7B = pT7B.slice(startIndex);
+    const activeT8A = pT8A.slice(startIndex);
+    const activeT8B = pT8B.slice(startIndex);
+    const activeAF3A = pAF3A.slice(startIndex);
+    const activeAF4A = pAF4A.slice(startIndex);
+    const activeAF3B = pAF3B.slice(startIndex);
+    const activeAF4B = pAF4B.slice(startIndex);
 
     // 3. Time-Lag or Standard Correlation on Integrated Gamma
     let pGamma = 0;
     let detectedLag = 0;
     if (useTimeLag) {
-      const lagRes = timeLaggedSpearmanCorrelation(integratedGammaA, integratedGammaB, 3);
+      const lagRes = timeLaggedSpearmanCorrelation(activeIntA, activeIntB, 3);
       pGamma = lagRes.maxCorr;
       detectedLag = lagRes.optimalLag;
     } else {
-      pGamma = spearmanCorrelation(integratedGammaA, integratedGammaB);
+      pGamma = spearmanCorrelation(activeIntA, activeIntB);
     }
 
     // 4. Channel-by-Channel Correlation Coefficients
-    const rPz = spearmanCorrelation(pPzA, pPzB);
-    const rT7 = spearmanCorrelation(pT7A, pT7B);
-    const rT8 = spearmanCorrelation(pT8A, pT8B);
+    const rPz = spearmanCorrelation(activePzA, activePzB);
+    const rT7 = spearmanCorrelation(activeT7A, activeT7B);
+    const rT8 = spearmanCorrelation(activeT8A, activeT8B);
 
     // 5. Emotional Profile Extraction & Cosine Similarity
     let emotionColsA = EMOTION_KEYS.map(e => findColumn(headersA, e.keywords));
@@ -581,12 +595,33 @@ function App() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { position: 'top', labels: { color: textColor, font: { family: 'Noto Sans KR', size: 12 } } }
+      legend: { position: 'top', labels: { color: textColor, font: { family: 'Noto Sans KR', size: 12 } } },
+      tooltip: {
+        callbacks: {
+          title: (items) => {
+            if (!items || !items.length) return '';
+            const sec = parseInt(items[0].label) || 0;
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return `시간: ${sec}초 (${m > 0 ? `${m}분 ` : ''}${s}초)`;
+          }
+        }
+      }
     },
     scales: {
       x: { 
-        title: { display: true, text: '시간 흐름 (Time / Sec)', color: textColor, font: { family: 'Noto Sans KR', size: 11, weight: 'bold' } },
-        grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } 
+        title: { display: true, text: '시간 흐름 (Time / Sec - 0초 ~ 300초 / 5분 전체)', color: textColor, font: { family: 'Noto Sans KR', size: 11, weight: 'bold' } },
+        grid: { color: gridColor }, 
+        ticks: { 
+          color: textColor, 
+          font: { size: 10 },
+          maxTicksLimit: 11,
+          callback: function(val) {
+            const sec = parseInt(this.getLabelForValue(val)) || 0;
+            if (sec % 60 === 0) return `${sec}s (${sec / 60}분)`;
+            return `${sec}s`;
+          }
+        } 
       },
       y: { 
         title: { display: true, text: '감마파 전력 밀도 (Gamma Power / μV²)', color: textColor, font: { family: 'Noto Sans KR', size: 11, weight: 'bold' } },
