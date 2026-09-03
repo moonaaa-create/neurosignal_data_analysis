@@ -879,6 +879,15 @@ body {
   font-weight: 800;
 }
 
+.sensor-subtext {
+  fill: var(--text-muted);
+  font-size: 8.5px;
+  font-weight: 800;
+  text-anchor: middle;
+  font-family: 'Outfit', sans-serif;
+  pointer-events: none;
+}
+
 .brain-map-caption {
   display: flex;
   flex-direction: column;

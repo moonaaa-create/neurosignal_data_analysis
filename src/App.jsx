@@ -1037,48 +1037,92 @@ function App() {
                     <p className="chart-subtitle">Pz(두정엽), T7(좌측두엽), T8(우측두엽) 각 영역별 두 참여자 간의 독립 상관계수</p>
                   </div>
 
-                  <div className="brain-map-grid">
-                    
-                    {/* SVG Brain Map Graphic */}
-                    <div className="brain-svg-container">
-                      <svg viewBox="0 0 300 300" className="brain-topography-svg">
-                        {/* Head Outline */}
-                        <ellipse cx="150" cy="150" rx="110" ry="125" fill="none" stroke="var(--border-subtle)" strokeWidth="3" />
-                        {/* Nose */}
-                        <path d="M 140 25 Q 150 10 160 25" fill="none" stroke="var(--border-subtle)" strokeWidth="3" />
-                        {/* Ears */}
-                        <path d="M 38 135 Q 25 150 38 165" fill="none" stroke="var(--border-subtle)" strokeWidth="3" />
-                        <path d="M 262 135 Q 275 150 262 165" fill="none" stroke="var(--border-subtle)" strokeWidth="3" />
+                  {(() => {
+                    const pzScore = results ? Math.round(corrToNeuroScore(results.channelCorrs.rPz)) : 50;
+                    const t7Score = results ? Math.round(corrToNeuroScore(results.channelCorrs.rT7)) : 50;
+                    const t8Score = results ? Math.round(corrToNeuroScore(results.channelCorrs.rT8)) : 50;
 
-                        {/* AF3 (Frontal Left) */}
-                        <circle cx="105" cy="85" r="10" className="sensor-node frontal" />
-                        <text x="105" y="89" className="sensor-text">AF3</text>
+                    // Dynamic circle radius based on synchrony score (11px at 0점 to 28px at 100점)
+                    const radiusPz = 11 + (pzScore / 100) * 17;
+                    const radiusT7 = 11 + (t7Score / 100) * 17;
+                    const radiusT8 = 11 + (t8Score / 100) * 17;
 
-                        {/* AF4 (Frontal Right) */}
-                        <circle cx="195" cy="85" r="10" className="sensor-node frontal" />
-                        <text x="195" y="89" className="sensor-text">AF4</text>
+                    return (
+                      <div className="brain-map-grid">
+                        
+                        {/* SVG Brain Map Graphic */}
+                        <div className="brain-svg-container">
+                          <svg viewBox="0 0 300 300" className="brain-topography-svg">
+                            {/* Head Outline */}
+                            <ellipse cx="150" cy="150" rx="110" ry="125" fill="none" stroke="var(--border-subtle)" strokeWidth="3" />
+                            {/* Nose */}
+                            <path d="M 140 25 Q 150 10 160 25" fill="none" stroke="var(--border-subtle)" strokeWidth="3" />
+                            {/* Ears */}
+                            <path d="M 38 135 Q 25 150 38 165" fill="none" stroke="var(--border-subtle)" strokeWidth="3" />
+                            <path d="M 262 135 Q 275 150 262 165" fill="none" stroke="var(--border-subtle)" strokeWidth="3" />
 
-                        {/* T7 (Left Temporal) */}
-                        <circle cx="60" cy="150" r="16" className="sensor-node temporal-t7 active-pulse" />
-                        <text x="60" y="154" className="sensor-text active">T7</text>
+                            {/* AF3 (Frontal Left) */}
+                            <circle cx="105" cy="85" r="10" className="sensor-node frontal" />
+                            <text x="105" y="89" className="sensor-text">AF3</text>
 
-                        {/* T8 (Right Temporal) */}
-                        <circle cx="240" cy="150" r="16" className="sensor-node temporal-t8 active-pulse" />
-                        <text x="240" y="154" className="sensor-text active">T8</text>
+                            {/* AF4 (Frontal Right) */}
+                            <circle cx="195" cy="85" r="10" className="sensor-node frontal" />
+                            <text x="195" y="89" className="sensor-text">AF4</text>
 
-                        {/* Pz (Parietal Midline) */}
-                        <circle cx="150" cy="205" r="18" className="sensor-node parietal-pz active-pulse" />
-                        <text x="150" y="209" className="sensor-text active">Pz</text>
-                      </svg>
-                      <div className="brain-map-caption">
-                        <span>● Pz: 두정엽 (주의·인지)</span>
-                        <span>● T7: 좌측두엽 (언어)</span>
-                        <span>● T8: 우측두엽 (공감)</span>
-                      </div>
-                    </div>
+                            {/* T7 (Left Temporal) */}
+                            <circle 
+                              cx="60" 
+                              cy="150" 
+                              r={radiusT7} 
+                              className="sensor-node temporal-t7 active-pulse" 
+                              style={{ 
+                                filter: `drop-shadow(0 0 ${4 + (t7Score / 100) * 8}px rgba(20, 184, 166, ${(t7Score/100)*0.7 + 0.3}))`
+                              }}
+                            />
+                            <text x="60" y={radiusT7 >= 16 ? 146 : 153} className="sensor-text active">T7</text>
+                            {radiusT7 >= 16 && (
+                              <text x="60" y="159" className="sensor-subtext">{t7Score}점</text>
+                            )}
 
-                    {/* Channel Cards */}
-                    <div className="channel-stats-list">
+                            {/* T8 (Right Temporal) */}
+                            <circle 
+                              cx="240" 
+                              cy="150" 
+                              r={radiusT8} 
+                              className="sensor-node temporal-t8 active-pulse" 
+                              style={{ 
+                                filter: `drop-shadow(0 0 ${4 + (t8Score / 100) * 8}px rgba(168, 85, 247, ${(t8Score/100)*0.7 + 0.3}))`
+                              }}
+                            />
+                            <text x="240" y={radiusT8 >= 16 ? 146 : 153} className="sensor-text active">T8</text>
+                            {radiusT8 >= 16 && (
+                              <text x="240" y="159" className="sensor-subtext">{t8Score}점</text>
+                            )}
+
+                            {/* Pz (Parietal Midline) */}
+                            <circle 
+                              cx="150" 
+                              cy="205" 
+                              r={radiusPz} 
+                              className="sensor-node parietal-pz active-pulse" 
+                              style={{ 
+                                filter: `drop-shadow(0 0 ${4 + (pzScore / 100) * 8}px rgba(59, 130, 246, ${(pzScore/100)*0.7 + 0.3}))`
+                              }}
+                            />
+                            <text x="150" y={radiusPz >= 16 ? 201 : 208} className="sensor-text active">Pz</text>
+                            {radiusPz >= 16 && (
+                              <text x="150" y="214" className="sensor-subtext">{pzScore}점</text>
+                            )}
+                          </svg>
+                          <div className="brain-map-caption">
+                            <span>● Pz (두정엽): 동조율 <strong>{pzScore}점</strong> (원 반경: {Math.round(radiusPz)}px)</span>
+                            <span>● T7 (좌측두엽): 동조율 <strong>{t7Score}점</strong> (원 반경: {Math.round(radiusT7)}px)</span>
+                            <span>● T8 (우측두엽): 동조율 <strong>{t8Score}점</strong> (원 반경: {Math.round(radiusT8)}px)</span>
+                          </div>
+                        </div>
+
+                        {/* Channel Cards */}
+                        <div className="channel-stats-list">
                       
                       <div className="channel-stat-item">
                         <div className="stat-channel-head">
@@ -1141,7 +1185,9 @@ function App() {
                     )}
 
                   </div>
-                </div>
+                );
+              })()}
+            </div>
 
                 {/* 5-MINUTE EXPERIMENT TIMELINE & MOVING SYNCHRONY SECTION */}
                 {results.timelineAnalysis && (
