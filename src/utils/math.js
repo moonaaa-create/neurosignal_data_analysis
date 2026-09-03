@@ -18,7 +18,7 @@ export function getRanks(arr) {
 }
 
 export function pearsonCorrelation(x, y) {
-  if (x.length !== y.length || x.length === 0) return 0;
+  if (!x || !y || x.length !== y.length || x.length === 0) return 0;
   const n = x.length;
   let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
   for (let i = 0; i < n; i++) {
@@ -30,15 +30,91 @@ export function pearsonCorrelation(x, y) {
   }
   const numerator = (n * sumXY) - (sumX * sumY);
   const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
-  if (denominator === 0) return 0;
-  return numerator / denominator;
+  if (denominator === 0 || isNaN(denominator)) return 0;
+  return Math.max(-1, Math.min(1, numerator / denominator));
 }
 
 export function spearmanCorrelation(x, y) {
-  if (x.length !== y.length || x.length === 0) return 0;
+  if (!x || !y || x.length !== y.length || x.length === 0) return 0;
   const rankX = getRanks(x);
   const rankY = getRanks(y);
   return pearsonCorrelation(rankX, rankY);
+}
+
+// Fisher z-transformation to stabilize correlation values for averaging/aggregation
+export function fisherZ(r) {
+  const clamped = Math.max(-0.9999, Math.min(0.9999, r));
+  return 0.5 * Math.log((1 + clamped) / (1 - clamped));
+}
+
+export function invFisherZ(z) {
+  const exp2z = Math.exp(2 * z);
+  return (exp2z - 1) / (exp2z + 1);
+}
+
+// Calculate Cosine Similarity between two emotional profile vectors
+export function calculateCosineSimilarity(vecA, vecB) {
+  if (!vecA || !vecB || vecA.length !== vecB.length || vecA.length === 0) return 0;
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+// =========================================
+// TRI-REGION (Pz, T7, T8) WEIGHTED GAMMA
+// =========================================
+/**
+ * Computes the weighted average gamma series from Pz, T7, and T8 channels.
+ * @param {Array<number>} gammaPz - Parietal gamma series
+ * @param {Array<number>} gammaT7 - Left temporal gamma series
+ * @param {Array<number>} gammaT8 - Right temporal gamma series
+ * @param {number} wPz - Weight for Pz (default: 0.40)
+ * @param {number} wT7 - Weight for T7 (default: 0.30)
+ * @param {number} wT8 - Weight for T8 (default: 0.30)
+ */
+export function calculateWeightedGamma(gammaPz, gammaT7, gammaT8, wPz = 0.4, wT7 = 0.3, wT8 = 0.3) {
+  const len = Math.max(gammaPz?.length || 0, gammaT7?.length || 0, gammaT8?.length || 0);
+  if (len === 0) return [];
+
+  const totalWeight = (wPz + wT7 + wT8) || 1.0;
+  const result = [];
+
+  for (let i = 0; i < len; i++) {
+    const valPz = gammaPz && gammaPz[i] !== undefined ? gammaPz[i] : null;
+    const valT7 = gammaT7 && gammaT7[i] !== undefined ? gammaT7[i] : null;
+    const valT8 = gammaT8 && gammaT8[i] !== undefined ? gammaT8[i] : null;
+
+    let weightedSum = 0;
+    let actualWeight = 0;
+
+    if (valPz !== null && !isNaN(valPz)) {
+      weightedSum += valPz * wPz;
+      actualWeight += wPz;
+    }
+    if (valT7 !== null && !isNaN(valT7)) {
+      weightedSum += valT7 * wT7;
+      actualWeight += wT7;
+    }
+    if (valT8 !== null && !isNaN(valT8)) {
+      weightedSum += valT8 * wT8;
+      actualWeight += wT8;
+    }
+
+    if (actualWeight > 0) {
+      result.push(weightedSum / actualWeight);
+    } else {
+      result.push(0);
+    }
+  }
+
+  return result;
 }
 
 // Calculate FAA: ln(AF4_Alpha) - ln(AF3_Alpha)
@@ -47,11 +123,12 @@ export function calculateFAA(af3, af4) {
   return Math.log(af4) - Math.log(af3);
 }
 
-// Calculate R_Avoidance
+// Calculate R_Avoidance (Original discrete ratio)
 export function calculateRAvoidance(af3A, af4A, af3B, af4B) {
-  if (af3A.length === 0) return 0;
+  if (!af3A || af3A.length === 0) return 0;
   let avoidanceCount = 0;
   const T = Math.min(af3A.length, af4A.length, af3B.length, af4B.length);
+  if (T === 0) return 0;
   
   for (let t = 0; t < T; t++) {
     const faaA = calculateFAA(af3A[t], af4A[t]);
@@ -64,11 +141,108 @@ export function calculateRAvoidance(af3A, af4A, af3B, af4B) {
   return avoidanceCount / T;
 }
 
-// Calculate Final Friendship Score
+// Continuous FAA Avoidance Penalty (Combines frequency + intensity)
+export function calculateContinuousAvoidancePenalty(af3A, af4A, af3B, af4B, wFaa = 0.25) {
+  const T = Math.min(af3A?.length || 0, af4A?.length || 0, af3B?.length || 0, af4B?.length || 0);
+  if (T === 0) return { rAvoidance: 0, penaltyFactor: 0, avgFaaA: 0, avgFaaB: 0 };
+
+  let avoidanceCount = 0;
+  let totalNegativeMagA = 0;
+  let totalNegativeMagB = 0;
+  let sumFaaA = 0;
+  let sumFaaB = 0;
+
+  for (let t = 0; t < T; t++) {
+    const faaA = calculateFAA(af3A[t], af4A[t]);
+    const faaB = calculateFAA(af3B[t], af4B[t]);
+    sumFaaA += faaA;
+    sumFaaB += faaB;
+
+    let isAvoid = false;
+    if (faaA < 0) {
+      totalNegativeMagA += Math.abs(faaA);
+      isAvoid = true;
+    }
+    if (faaB < 0) {
+      totalNegativeMagB += Math.abs(faaB);
+      isAvoid = true;
+    }
+    if (isAvoid) avoidanceCount++;
+  }
+
+  const rAvoidance = avoidanceCount / T;
+  const avgNegativeIntensity = (totalNegativeMagA + totalNegativeMagB) / (2 * T);
+  // Softplus/Sigmoidal smooth scaling for intensity
+  const intensityPenalty = Math.log(1 + Math.exp(avgNegativeIntensity * 2)) * 0.5;
+
+  // Composite avoidance penalty factor (0 to 1 scale)
+  const penaltyFactor = Math.min(1.0, wFaa * (0.6 * rAvoidance + 0.4 * Math.min(1, intensityPenalty)));
+
+  return {
+    rAvoidance,
+    penaltyFactor,
+    avgFaaA: sumFaaA / T,
+    avgFaaB: sumFaaB / T
+  };
+}
+
+// Calculate Friendship Score (Legacy compatibility)
 export function calculateFriendshipScore(pGamma, rAvoidance, wSync = 1.0, wFaa = 0.25) {
   const pNormalized = (pGamma + 1) / 2;
   const rawScore = (wSync * pNormalized) * (1 - (wFaa * rAvoidance)) * 100;
-  return Math.max(0, Math.min(100, rawScore)); // Clamp between 0 and 100
+  return Math.max(0, Math.min(100, rawScore));
+}
+
+// ================================================================
+// ADVANCED TR-SEM v3.0 (Tri-Region Synchro-Emotional Model) SCORE
+// ================================================================
+export function calculateImprovedSyncScore({
+  multiGammaCorr, // Correlation of integrated/weighted gamma
+  channelCorrs = {}, // { rPz, rT7, rT8 }
+  channelWeights = { wPz: 0.4, wT7: 0.3, wT8: 0.3 },
+  rAvoidance = 0,
+  avoidancePenalty = 0,
+  emotionHarmony = 1.0,
+  wSync = 0.80,
+  wEmotion = 0.20
+}) {
+  // 1. Channel-wise weighted correlation using Fisher-z transform
+  let zSum = 0;
+  let weightSum = 0;
+  
+  if (channelCorrs.rPz !== undefined && !isNaN(channelCorrs.rPz)) {
+    zSum += fisherZ(channelCorrs.rPz) * (channelWeights.wPz || 0.4);
+    weightSum += (channelWeights.wPz || 0.4);
+  }
+  if (channelCorrs.rT7 !== undefined && !isNaN(channelCorrs.rT7)) {
+    zSum += fisherZ(channelCorrs.rT7) * (channelWeights.wT7 || 0.3);
+    weightSum += (channelWeights.wT7 || 0.3);
+  }
+  if (channelCorrs.rT8 !== undefined && !isNaN(channelCorrs.rT8)) {
+    zSum += fisherZ(channelCorrs.rT8) * (channelWeights.wT8 || 0.3);
+    weightSum += (channelWeights.wT8 || 0.3);
+  }
+
+  const channelZAvg = weightSum > 0 ? invFisherZ(zSum / weightSum) : multiGammaCorr;
+
+  // Ensemble between Integrated Gamma correlation and Cross-Channel average
+  const ensembleGammaSync = (multiGammaCorr * 0.6) + (channelZAvg * 0.4);
+  const normalizedSync = (ensembleGammaSync + 1) / 2; // Map [-1, 1] to [0, 1]
+
+  // Avoidance discount
+  const syncAfterAvoidance = normalizedSync * Math.max(0, (1 - avoidancePenalty));
+
+  // Multi-modal fusion with Emotional harmony (Cosine similarity)
+  const normalizedEmotion = Math.max(0, Math.min(1, (emotionHarmony + 1) / 2));
+  const rawFinalScore = (wSync * syncAfterAvoidance + wEmotion * normalizedEmotion) * 100;
+
+  return {
+    score: Math.max(0, Math.min(100, rawFinalScore)),
+    ensembleGammaSync,
+    normalizedSync,
+    syncAfterAvoidance,
+    channelZAvg
+  };
 }
 
 // =========================================
@@ -77,7 +251,7 @@ export function calculateFriendshipScore(pGamma, rAvoidance, wSync = 1.0, wFaa =
 
 // Module 01 & 04: Filter Outlier Spikes (Z-Score Thresholding for EOG/EMG)
 export function filterEOGOutliers(arr, zThreshold = 2.0) {
-  if (arr.length === 0) return { filtered: [], outlierCount: 0 };
+  if (!arr || arr.length === 0) return { filtered: [], outlierCount: 0 };
   const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
   const std = Math.sqrt(arr.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / arr.length) || 1;
   
@@ -96,7 +270,7 @@ export function filterEOGOutliers(arr, zThreshold = 2.0) {
 
 // Module 03: Time-Lagged Cross Correlation (Emotional Echo Detection)
 export function timeLaggedPearsonCorrelation(x, y, maxLag = 3) {
-  if (x.length === 0 || y.length === 0) return { maxCorr: 0, optimalLag: 0 };
+  if (!x || !y || x.length === 0 || y.length === 0) return { maxCorr: 0, optimalLag: 0 };
   let bestCorr = -1;
   let bestLag = 0;
   
@@ -124,7 +298,7 @@ export function timeLaggedPearsonCorrelation(x, y, maxLag = 3) {
 }
 
 export function timeLaggedSpearmanCorrelation(x, y, maxLag = 3) {
-  if (x.length === 0 || y.length === 0) return { maxCorr: 0, optimalLag: 0 };
+  if (!x || !y || x.length === 0 || y.length === 0) return { maxCorr: 0, optimalLag: 0 };
   let bestCorr = -1;
   let bestLag = 0;
   
@@ -153,33 +327,107 @@ export function timeLaggedSpearmanCorrelation(x, y, maxLag = 3) {
 
 // Module 05: Subject Baseline Log Normalization
 export function normalizeLog(arr) {
-  if (arr.length === 0) return arr;
+  if (!arr || arr.length === 0) return [];
   return arr.map(v => (v > 0 ? Math.log(v) : 0));
 }
 
-// Complete Advanced Comparison Pipeline
+// Complete Tri-Region Advanced Comparison Pipeline
+export function runTriRegionPipeline({
+  pzA, t7A, t8A,
+  pzB, t7B, t8B,
+  af3A, af4A, af3B, af4B,
+  wPz = 0.4, wT7 = 0.3, wT8 = 0.3,
+  wSync = 0.8, wFaa = 0.25, wEmotion = 0.2,
+  emotionVecA = [], emotionVecB = []
+}) {
+  // 1. Calculate Weighted Integrated Gamma Series
+  const rawGammaA = calculateWeightedGamma(pzA, t7A, t8A, wPz, wT7, wT8);
+  const rawGammaB = calculateWeightedGamma(pzB, t7B, t8B, wPz, wT7, wT8);
+
+  // 2. Channel-wise Individual Correlations
+  const rPz = spearmanCorrelation(pzA || [], pzB || []);
+  const rT7 = spearmanCorrelation(t7A || [], t7B || []);
+  const rT8 = spearmanCorrelation(t8A || [], t8B || []);
+  const channelCorrs = { rPz, rT7, rT8 };
+
+  // 3. Artifact Filtering
+  const cleanGammaA = filterEOGOutliers(rawGammaA);
+  const cleanGammaB = filterEOGOutliers(rawGammaB);
+  const cleanPzA = filterEOGOutliers(pzA || []).filtered;
+  const cleanPzB = filterEOGOutliers(pzB || []).filtered;
+  const cleanT7A = filterEOGOutliers(t7A || []).filtered;
+  const cleanT7B = filterEOGOutliers(t7B || []).filtered;
+  const cleanT8A = filterEOGOutliers(t8A || []).filtered;
+  const cleanT8B = filterEOGOutliers(t8B || []).filtered;
+
+  const totalArtifacts = cleanGammaA.outlierCount + cleanGammaB.outlierCount;
+
+  // 4. Time-Lagged Cross Correlation on Integrated Gamma
+  const { maxCorr: lagCorr, optimalLag } = timeLaggedSpearmanCorrelation(cleanGammaA.filtered, cleanGammaB.filtered, 3);
+
+  // 5. Cleaned AF3/AF4 Avoidance & Continuous Penalty
+  const cleanAF3A = filterEOGOutliers(af3A || []).filtered;
+  const cleanAF4A = filterEOGOutliers(af4A || []).filtered;
+  const cleanAF3B = filterEOGOutliers(af3B || []).filtered;
+  const cleanAF4B = filterEOGOutliers(af4B || []).filtered;
+
+  const continuousAvoidance = calculateContinuousAvoidancePenalty(cleanAF3A, cleanAF4A, cleanAF3B, cleanAF4B, wFaa);
+  const emotionHarmony = calculateCosineSimilarity(emotionVecA, emotionVecB) || 0.85;
+
+  // 6. Final Advanced Score (TR-SEM v3.0)
+  const syncResult = calculateImprovedSyncScore({
+    multiGammaCorr: lagCorr,
+    channelCorrs: {
+      rPz: spearmanCorrelation(cleanPzA, cleanPzB),
+      rT7: spearmanCorrelation(cleanT7A, cleanT7B),
+      rT8: spearmanCorrelation(cleanT8A, cleanT8B),
+    },
+    channelWeights: { wPz, wT7, wT8 },
+    rAvoidance: continuousAvoidance.rAvoidance,
+    avoidancePenalty: continuousAvoidance.penaltyFactor,
+    emotionHarmony,
+    wSync,
+    wEmotion
+  });
+
+  return {
+    rawGammaA,
+    rawGammaB,
+    cleanGammaA: cleanGammaA.filtered,
+    cleanGammaB: cleanGammaB.filtered,
+    cleanPzA, cleanPzB,
+    cleanT7A, cleanT7B,
+    cleanT8A, cleanT8B,
+    channelCorrs,
+    advancedScore: syncResult.score,
+    advancedCorr: lagCorr,
+    optimalLag,
+    totalArtifacts,
+    rAvoidance: continuousAvoidance.rAvoidance,
+    avoidancePenalty: continuousAvoidance.penaltyFactor,
+    emotionHarmony,
+    syncResult
+  };
+}
+
+// Complete Advanced Comparison Pipeline (Legacy wrapper)
 export function runAdvancedComparisonPipeline(arrGammaA, arrGammaB, af3A, af4A, af3B, af4B, wSync = 1.0, wFaa = 0.25) {
-  // 1. Raw Calculation
   const rawCorr = spearmanCorrelation(arrGammaA, arrGammaB);
   const rawAvoidance = calculateRAvoidance(af3A, af4A, af3B, af4B);
   const rawScore = calculateFriendshipScore(rawCorr, rawAvoidance, wSync, wFaa);
   
-  // 2. Advanced Module 01 & 04: EOG / EMG Outlier Filtering
   const cleanGammaA = filterEOGOutliers(arrGammaA);
   const cleanGammaB = filterEOGOutliers(arrGammaB);
   const totalArtifacts = cleanGammaA.outlierCount + cleanGammaB.outlierCount;
   
-  // 3. Advanced Module 03: Time-Lagged Sync
   const { maxCorr: lagCorr, optimalLag } = timeLaggedSpearmanCorrelation(cleanGammaA.filtered, cleanGammaB.filtered, 3);
   
-  // 4. Advanced Module 02 & 05: Filtered Avoidance
   const cleanAF3A = filterEOGOutliers(af3A).filtered;
   const cleanAF4A = filterEOGOutliers(af4A).filtered;
   const cleanAF3B = filterEOGOutliers(af3B).filtered;
   const cleanAF4B = filterEOGOutliers(af4B).filtered;
   const filteredAvoidance = calculateRAvoidance(cleanAF3A, cleanAF4A, cleanAF3B, cleanAF4B);
   
-  // 5. Final Advanced Score
   const advancedScore = calculateFriendshipScore(lagCorr, filteredAvoidance, wSync, wFaa);
   
   return {
@@ -195,3 +443,87 @@ export function runAdvancedComparisonPipeline(arrGammaA, arrGammaB, af3A, af4A, 
     cleanedGammaB: cleanGammaB.filtered
   };
 }
+
+// ================================================================
+// 5-MINUTE TIMELINE & MOVING WINDOW SYNCHRONY ANALYSIS
+// ================================================================
+export function calculateTimeWindowSynchrony(gammaA, gammaB, windowSize = 30, stepSize = 5) {
+  if (!gammaA || !gammaB || gammaA.length < 10) {
+    return { minuteSegments: [], movingSyncCurve: [], peakPeriod: null, lowestPeriod: null };
+  }
+
+  const len = Math.min(gammaA.length, gammaB.length);
+
+  // 1. Moving Window Sync Curve
+  const movingSyncCurve = [];
+  let maxWindowSync = -1;
+  let minWindowSync = 999;
+  let peakTimeSec = 0;
+  let lowestTimeSec = 0;
+
+  for (let start = 0; start + windowSize <= len; start += stepSize) {
+    const end = start + windowSize;
+    const subA = gammaA.slice(start, end);
+    const subB = gammaB.slice(start, end);
+    const corr = spearmanCorrelation(subA, subB);
+    const syncPercent = Math.max(0, Math.min(100, Math.round(((corr + 1) / 2) * 100)));
+    const centerTimeSec = Math.round(start + windowSize / 2);
+
+    movingSyncCurve.push({
+      timeSec: centerTimeSec,
+      timeLabel: `${Math.floor(centerTimeSec / 60)}분 ${centerTimeSec % 60}초`,
+      syncScore: syncPercent,
+      corr
+    });
+
+    if (syncPercent > maxWindowSync) {
+      maxWindowSync = syncPercent;
+      peakTimeSec = centerTimeSec;
+    }
+    if (syncPercent < minWindowSync) {
+      minWindowSync = syncPercent;
+      lowestTimeSec = centerTimeSec;
+    }
+  }
+
+  // 2. 1-Minute Segment Breakdown (e.g. 0-60s, 60-120s, 120-180s, 180-240s, 240-300s)
+  const minuteSegments = [];
+  const segmentSec = 60;
+  const numSegments = Math.ceil(len / segmentSec);
+
+  for (let m = 0; m < numSegments; m++) {
+    const segStart = m * segmentSec;
+    const segEnd = Math.min(len, (m + 1) * segmentSec);
+    if (segEnd - segStart < 5) continue;
+
+    const subA = gammaA.slice(segStart, segEnd);
+    const subB = gammaB.slice(segStart, segEnd);
+    const corr = spearmanCorrelation(subA, subB);
+    const syncScore = Math.max(0, Math.min(100, Math.round(((corr + 1) / 2) * 100)));
+
+    minuteSegments.push({
+      segmentIndex: m + 1,
+      label: `${m}분 ~ ${m + 1}분 (${segStart}s ~ ${segEnd}s)`,
+      startSec: segStart,
+      endSec: segEnd,
+      syncScore,
+      corr: parseFloat(corr.toFixed(3))
+    });
+  }
+
+  return {
+    minuteSegments,
+    movingSyncCurve,
+    peakPeriod: {
+      timeSec: peakTimeSec,
+      timeLabel: `${Math.floor(peakTimeSec / 60)}분 ${peakTimeSec % 60}초 부근`,
+      score: maxWindowSync >= 0 ? maxWindowSync : 0
+    },
+    lowestPeriod: {
+      timeSec: lowestTimeSec,
+      timeLabel: `${Math.floor(lowestTimeSec / 60)}분 ${lowestTimeSec % 60}초 부근`,
+      score: minWindowSync <= 100 ? minWindowSync : 0
+    }
+  };
+}
+
