@@ -10,7 +10,7 @@ import {
   pearsonCorrelation, spearmanCorrelation, calculateRAvoidance, 
   calculateFriendshipScore, filterEOGOutliers, timeLaggedSpearmanCorrelation, 
   timeLaggedPearsonCorrelation, normalizeLog, calculateWeightedGamma, 
-  calculateContinuousAvoidancePenalty, calculateCosineSimilarity, 
+  calculateContinuousAvoidancePenalty, calculateContinuousFAABalance, calculateCosineSimilarity, 
   calculateImprovedSyncScore, runTriRegionPipeline, calculateTimeWindowSynchrony,
   corrToNeuroScore
 } from './utils/math';
