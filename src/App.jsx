@@ -516,6 +516,7 @@ function App() {
       emotionHarmony,
       channelCorrs: { rPz, rT7, rT8 },
       weights: { wPz, wT7, wT8 },
+      syncCalculation,
       hasMultiChannel,
       matchedColumns,
       timelineAnalysis,
@@ -846,7 +847,18 @@ function App() {
               </div>
 
               <div className="weight-formula-note">
-                📐 <strong>가중평균 통합 감마파 공식</strong>: Gamma_Integrated(t) = ({Math.round(wPz*100)}% × Pz + {Math.round(wT7*100)}% × T7 + {Math.round(wT8*100)}% × T8) / {Math.round((wPz+wT7+wT8)*100)}%
+                <div style={{ marginBottom: '0.4rem' }}>
+                  📐 <strong>3영역 가중 동기화 공식</strong>: 
+                  <span> Pz({Math.round((wPz / ((wPz + wT7 + wT8) || 1)) * 100)}%) + T7({Math.round((wT7 / ((wPz + wT7 + wT8) || 1)) * 100)}%) + T8({Math.round((wT8 / ((wPz + wT7 + wT8) || 1)) * 100)}%)</span>
+                </div>
+                {results && results.syncCalculation && results.syncCalculation.channelContributions && (
+                  <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--text-main)', marginTop: '0.4rem', padding: '0.4rem 0.6rem', background: 'var(--bg-card)', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                    <span>🔵 Pz 기여: <strong>{results.syncCalculation.channelContributions.pz}점</strong></span>
+                    <span>🟢 T7 기여: <strong>{results.syncCalculation.channelContributions.t7}점</strong></span>
+                    <span>🟣 T8 기여: <strong>{results.syncCalculation.channelContributions.t8}점</strong></span>
+                    <span>➔ 뇌파 가중합: <strong>{results.syncCalculation.baseGammaScore}점</strong> (정서 결합 최종 점수: <strong>{results.score}점</strong>)</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1128,7 +1140,7 @@ function App() {
                         <div className="stat-channel-head">
                           <span className="stat-tag pz">Pz 두정엽</span>
                           <span className="stat-role">고차원 인지 몰입 & 주의집중</span>
-                          <span className="stat-weight">가중치 {Math.round(wPz * 100)}%</span>
+                          <span className="stat-weight">가중치 {Math.round((wPz / ((wPz + wT7 + wT8) || 1)) * 100)}% {results.syncCalculation?.channelContributions?.pz !== undefined && `(기여 ${results.syncCalculation.channelContributions.pz}점)`}</span>
                         </div>
                         <div className="stat-val-bar">
                           <div className="stat-bar-fill pz-fill" style={{ width: `${Math.round(corrToNeuroScore(results.channelCorrs.rPz))}%` }} />
@@ -1142,7 +1154,7 @@ function App() {
                         <div className="stat-channel-head">
                           <span className="stat-tag t7">T7 좌측두엽</span>
                           <span className="stat-role">언어적 대화 & 구어 소통</span>
-                          <span className="stat-weight">가중치 {Math.round(wT7 * 100)}%</span>
+                          <span className="stat-weight">가중치 {Math.round((wT7 / ((wPz + wT7 + wT8) || 1)) * 100)}% {results.syncCalculation?.channelContributions?.t7 !== undefined && `(기여 ${results.syncCalculation.channelContributions.t7}점)`}</span>
                         </div>
                         <div className="stat-val-bar">
                           <div className="stat-bar-fill t7-fill" style={{ width: `${Math.round(corrToNeuroScore(results.channelCorrs.rT7))}%` }} />
@@ -1156,7 +1168,7 @@ function App() {
                         <div className="stat-channel-head">
                           <span className="stat-tag t8">T8 우측두엽</span>
                           <span className="stat-role">정서적 억양 & 비언어적 공감</span>
-                          <span className="stat-weight">가중치 {Math.round(wT8 * 100)}%</span>
+                          <span className="stat-weight">가중치 {Math.round((wT8 / ((wPz + wT7 + wT8) || 1)) * 100)}% {results.syncCalculation?.channelContributions?.t8 !== undefined && `(기여 ${results.syncCalculation.channelContributions.t8}점)`}</span>
                         </div>
                         <div className="stat-val-bar">
                           <div className="stat-bar-fill t8-fill" style={{ width: `${Math.round(corrToNeuroScore(results.channelCorrs.rT8))}%` }} />

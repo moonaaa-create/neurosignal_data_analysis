@@ -223,34 +223,23 @@ export function calculateImprovedSyncScore({
   wSync = 0.80,
   wEmotion = 0.20
 }) {
-  // 1. Channel-wise weighted correlation using Fisher-z transform
-  let zSum = 0;
-  let weightSum = 0;
-  
-  if (channelCorrs.rPz !== undefined && !isNaN(channelCorrs.rPz)) {
-    zSum += fisherZ(channelCorrs.rPz) * (channelWeights.wPz || 0.4);
-    weightSum += (channelWeights.wPz || 0.4);
-  }
-  if (channelCorrs.rT7 !== undefined && !isNaN(channelCorrs.rT7)) {
-    zSum += fisherZ(channelCorrs.rT7) * (channelWeights.wT7 || 0.3);
-    weightSum += (channelWeights.wT7 || 0.3);
-  }
-  if (channelCorrs.rT8 !== undefined && !isNaN(channelCorrs.rT8)) {
-    zSum += fisherZ(channelCorrs.rT8) * (channelWeights.wT8 || 0.3);
-    weightSum += (channelWeights.wT8 || 0.3);
-  }
+  // 1. Channel-wise calibrated neuro scores
+  const scorePz = corrToNeuroScore(channelCorrs.rPz !== undefined ? channelCorrs.rPz : 0);
+  const scoreT7 = corrToNeuroScore(channelCorrs.rT7 !== undefined ? channelCorrs.rT7 : 0);
+  const scoreT8 = corrToNeuroScore(channelCorrs.rT8 !== undefined ? channelCorrs.rT8 : 0);
 
-  const channelZAvg = weightSum > 0 ? invFisherZ(zSum / weightSum) : multiGammaCorr;
+  // Normalize channel weights so their sum equals 1.0
+  const totalWeight = ((channelWeights.wPz || 0) + (channelWeights.wT7 || 0) + (channelWeights.wT8 || 0)) || 1.0;
+  const normWPz = (channelWeights.wPz || 0) / totalWeight;
+  const normWT7 = (channelWeights.wT7 || 0) / totalWeight;
+  const normWT8 = (channelWeights.wT8 || 0) / totalWeight;
 
-  // Ensemble between Integrated Gamma correlation and Cross-Channel average
-  const ensembleGammaSync = (multiGammaCorr * 0.6) + (channelZAvg * 0.4);
-  
-  // Base Neuro-calibrated EEG synchrony score (0 ~ 100)
-  const baseGammaScore = corrToNeuroScore(ensembleGammaSync);
+  // Weighted channel synchrony score (directly responsive to slider adjustments)
+  const weightedChannelScore = (scorePz * normWPz) + (scoreT7 * normWT7) + (scoreT8 * normWT8);
 
   // Avoidance discount (Max 15% reduction for natural preservation)
   const discountFactor = Math.max(0.85, 1 - avoidancePenalty * 0.4);
-  const syncAfterAvoidance = baseGammaScore * discountFactor;
+  const syncAfterAvoidance = weightedChannelScore * discountFactor;
 
   // Multi-modal fusion with Emotional harmony (Cosine similarity, scaled 0~100)
   const emotionScore = Math.max(0, Math.min(100, emotionHarmony * 100));
@@ -258,10 +247,14 @@ export function calculateImprovedSyncScore({
 
   return {
     score: Math.max(0, Math.min(100, Math.round(rawFinalScore * 10) / 10)),
-    baseGammaScore,
-    ensembleGammaSync,
+    baseGammaScore: Math.round(weightedChannelScore * 10) / 10,
+    weightedChannelScore,
+    channelContributions: {
+      pz: Math.round(scorePz * normWPz * 10) / 10,
+      t7: Math.round(scoreT7 * normWT7 * 10) / 10,
+      t8: Math.round(scoreT8 * normWT8 * 10) / 10,
+    },
     syncAfterAvoidance,
-    channelZAvg,
     emotionScore
   };
 }
