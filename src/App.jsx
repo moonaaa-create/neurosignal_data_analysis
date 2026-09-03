@@ -106,6 +106,30 @@ function sampleData(arr, maxPoints = 300) {
   return arr.filter((_, i) => i % step === 0);
 }
 
+function getParticipantPersona(top1, top2) {
+  if (!top1 || !top2) return { icon: '✨', badge: '정서 탐구자', tag: '균형 정서형', desc: '다채로운 정서 리듬을 보여줍니다.' };
+  const n1 = top1.label.split(' ')[0];
+  const n2 = top2.label.split(' ')[0];
+  
+  if (n1 === '집중' || n2 === '집중') {
+    if (n1 === '몰입' || n2 === '몰입') return { icon: '🎯', badge: '딥 포커스 탐구러', tag: '초집중 몰입형', desc: '상대방의 모든 말과 장면에 온 신경을 집중하는 몰입형 리스너' };
+    if (n1 === '흥미' || n2 === '흥미') return { icon: '💡', badge: '호기심 천재 브레인', tag: '지적 탐구형', desc: '새로운 이야기와 지적 자극에 적극적으로 반응하는 탐험가' };
+    if (n1 === '이완' || n2 === '이완') return { icon: '🧘', badge: '차분한 관찰형 전략가', tag: '안정 집중형', desc: '흔들림 없이 편안한 태도로 맥락을 꿰뚫어 보는 타입' };
+  }
+  if (n1 === '흥분' || n2 === '흥분') {
+    if (n1 === '흥미' || n2 === '흥미') return { icon: '⚡', badge: '열정 리액션 폭격기', tag: '스파크 에너지형', desc: '상대방의 멘트에 즉각 텐션을 올리며 분위기를 주도하는 에너자이저' };
+    if (n1 === '몰입' || n2 === '몰입') return { icon: '🔥', badge: '진심 공감 에너자이저', tag: '정서 감응형', desc: '감정의 파동에 온전히 빠져들어 깊게 함께 느끼는 찐공감러' };
+  }
+  if (n1 === '이완' || n2 === '이완') {
+    if (n1 === '흥미' || n2 === '흥미') return { icon: '☕', badge: '힐링 무드 메이커', tag: '여유 탐색형', desc: '부드럽고 편안한 분위기 속에서 상대방의 마음을 여는 힐러' };
+    if (n1 === '몰입' || n2 === '몰입') return { icon: '🌿', badge: '온화한 소통 마스터', tag: '편안한 교감형', desc: '자연스러운 안정감으로 상대방에게 편안함을 선물하는 동행자' };
+  }
+  if (n1 === '스트레스' || n2 === '스트레스') {
+    return { icon: '🧗', badge: '섬세한 뇌파 완벽주의자', tag: '신중 관찰형', desc: '상황을 꼼꼼하게 살피며 신중하고 세심하게 소통하는 스타일' };
+  }
+  return { icon: '✨', badge: `${n1}·${n2} 멀티 플레이어`, tag: '다채로운 정서형', desc: `${n1}과 ${n2} 지수가 두드러져 다채롭고 매력적인 뇌파 리듬을 보입니다.` };
+}
+
 function App() {
   const [theme, setTheme] = useState('light');
   
@@ -1315,32 +1339,113 @@ function App() {
                       </div>
                     </div>
                     
-                    <div className="emotion-layout">
-                      <div className="chart-canvas-container radar">
-                        <Radar data={radarData} options={radarOptions} plugins={[radarDataPlugin]} />
-                      </div>
+                    {(() => {
+                      const sortedA = [...EMOTION_KEYS]
+                        .map(e => ({ ...e, score: Math.round(results.emotionsA[e.label] || 0) }))
+                        .sort((a, b) => b.score - a.score);
+                      const sortedB = [...EMOTION_KEYS]
+                        .map(e => ({ ...e, score: Math.round(results.emotionsB[e.label] || 0) }))
+                        .sort((a, b) => b.score - a.score);
+                      
+                      const topA1 = sortedA[0] || EMOTION_KEYS[0];
+                      const topA2 = sortedA[1] || EMOTION_KEYS[1];
+                      const topB1 = sortedB[0] || EMOTION_KEYS[0];
+                      const topB2 = sortedB[1] || EMOTION_KEYS[1];
 
-                      <div className="emotion-explanations">
-                        {EMOTION_KEYS.map((e, idx) => {
-                          const valA = Math.round(results.emotionsA[e.label] || 0);
-                          const valB = Math.round(results.emotionsB[e.label] || 0);
-                          const displayVal = radarSubject === 'B' ? valB : valA;
+                      const personaA = getParticipantPersona(topA1, topA2);
+                      const personaB = getParticipantPersona(topB1, topB2);
 
-                          return (
-                            <div className="emotion-item" key={idx}>
-                              <div className="emotion-item-header">
-                                <span className="emotion-name">{e.label.split(' ')[0].toUpperCase()}</span>
-                                <span className="emotion-score-badge">{radarSubject === 'BOTH' ? `A: ${valA}점 | B: ${valB}점` : `${displayVal}점`}</span>
+                      return (
+                        <>
+                          {/* TOP 2 PERSONA HIGHLIGHT CARDS */}
+                          <div className="persona-cards-grid">
+                            <div className="persona-card subject-a">
+                              <div className="persona-header">
+                                <span className="persona-subject">👤 <strong>{nameA}</strong>님의 뇌파 성향</span>
+                                <span className="persona-tag">{personaA.tag}</span>
                               </div>
-                              <div className="emotion-progress-bar">
-                                <div className="emotion-progress-fill" style={{ width: `${Math.min(100, Math.max(0, displayVal))}%` }} />
+                              <div className="persona-title-row">
+                                <span className="persona-icon">{personaA.icon}</span>
+                                <span className="persona-badge-title">{personaA.badge}</span>
                               </div>
-                              <div className="emotion-desc">{e.desc}</div>
+                              <div className="persona-top-traits">
+                                <div className="trait-pill">
+                                  <span className="trait-rank">🥇 <strong>1위: {topA1.label}</strong></span>
+                                  <span className="trait-score">{topA1.score}점</span>
+                                </div>
+                                <div className="trait-pill">
+                                  <span className="trait-rank">🥈 <strong>2위: {topA2.label}</strong></span>
+                                  <span className="trait-score">{topA2.score}점</span>
+                                </div>
+                              </div>
+                              <div className="persona-desc">"{personaA.desc}"</div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+
+                            <div className="persona-card subject-b">
+                              <div className="persona-header">
+                                <span className="persona-subject">👤 <strong>{nameB}</strong>님의 뇌파 성향</span>
+                                <span className="persona-tag">{personaB.tag}</span>
+                              </div>
+                              <div className="persona-title-row">
+                                <span className="persona-icon">{personaB.icon}</span>
+                                <span className="persona-badge-title">{personaB.badge}</span>
+                              </div>
+                              <div className="persona-top-traits">
+                                <div className="trait-pill">
+                                  <span className="trait-rank">🥇 <strong>1위: {topB1.label}</strong></span>
+                                  <span className="trait-score">{topB1.score}점</span>
+                                </div>
+                                <div className="trait-pill">
+                                  <span className="trait-rank">🥈 <strong>2위: {topB2.label}</strong></span>
+                                  <span className="trait-score">{topB2.score}점</span>
+                                </div>
+                              </div>
+                              <div className="persona-desc">"{personaB.desc}"</div>
+                            </div>
+                          </div>
+
+                          <div className="emotion-layout">
+                            <div className="chart-canvas-container radar">
+                              <Radar data={radarData} options={radarOptions} plugins={[radarDataPlugin]} />
+                            </div>
+
+                            <div className="emotion-explanations">
+                              {EMOTION_KEYS.map((e, idx) => {
+                                const valA = Math.round(results.emotionsA[e.label] || 0);
+                                const valB = Math.round(results.emotionsB[e.label] || 0);
+                                const displayVal = radarSubject === 'B' ? valB : valA;
+
+                                // Determine if this emotion is TOP 1 or TOP 2
+                                const isTop1A = topA1.label === e.label;
+                                const isTop2A = topA2.label === e.label;
+                                const isTop1B = topB1.label === e.label;
+                                const isTop2B = topB2.label === e.label;
+
+                                const isTop1 = radarSubject === 'A' ? isTop1A : radarSubject === 'B' ? isTop1B : (isTop1A || isTop1B);
+                                const isTop2 = radarSubject === 'A' ? isTop2A : radarSubject === 'B' ? isTop2B : (!isTop1 && (isTop2A || isTop2B));
+
+                                return (
+                                  <div className={`emotion-item ${isTop1 ? 'is-top-1' : isTop2 ? 'is-top-2' : ''}`} key={idx}>
+                                    <div className="emotion-item-header">
+                                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        <span className="emotion-name">{e.label.split(' ')[0].toUpperCase()}</span>
+                                        {isTop1 && <span className="top-rank-badge rank-1">🥇 TOP 1</span>}
+                                        {isTop2 && <span className="top-rank-badge rank-2">🥈 TOP 2</span>}
+                                      </div>
+                                      <span className="emotion-score-badge">{radarSubject === 'BOTH' ? `A: ${valA}점 | B: ${valB}점` : `${displayVal}점`}</span>
+                                    </div>
+                                    <div className="emotion-progress-bar">
+                                      <div className="emotion-progress-fill" style={{ width: `${Math.min(100, Math.max(0, displayVal))}%` }} />
+                                    </div>
+                                    <div className="emotion-desc">{e.desc}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
 
                   </div>
 

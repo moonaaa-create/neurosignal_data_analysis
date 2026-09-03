@@ -1117,6 +1117,172 @@ body {
   height: 480px;
 }
 
+/* Top 2 Persona Highlight Grid */
+.persona-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .persona-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.persona-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.persona-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.persona-card.subject-a {
+  border-left: 4px solid var(--accent-blue);
+}
+
+.persona-card.subject-b {
+  border-left: 4px solid var(--accent-purple);
+}
+
+.persona-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.persona-subject {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.persona-tag {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-weight: 700;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--accent-blue);
+}
+
+.subject-b .persona-tag {
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--accent-purple);
+}
+
+.persona-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.persona-icon {
+  font-size: 1.6rem;
+}
+
+.persona-badge-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.persona-top-traits {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px dashed var(--border-subtle);
+}
+
+.light-mode .persona-top-traits {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.trait-pill {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.trait-rank {
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.trait-score {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  color: var(--accent-blue);
+}
+
+.subject-b .trait-score {
+  color: var(--accent-purple);
+}
+
+.persona-desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  font-style: italic;
+}
+
+/* Rank Badges on Emotion List */
+.top-rank-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  margin-left: 0.5rem;
+  letter-spacing: 0.02em;
+}
+
+.top-rank-badge.rank-1 {
+  background: rgba(234, 179, 8, 0.15);
+  color: #ca8a04;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+
+.top-rank-badge.rank-2 {
+  background: rgba(148, 163, 184, 0.15);
+  color: #64748b;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.emotion-item.is-top-1 {
+  border-left: 3px solid #eab308;
+  padding-left: 0.6rem;
+  transition: all 0.2s ease;
+}
+
+.emotion-item.is-top-2 {
+  border-left: 3px solid #94a3b8;
+  padding-left: 0.6rem;
+  transition: all 0.2s ease;
+}
+
 .emotion-explanations {
   display: flex;
   flex-direction: column;
