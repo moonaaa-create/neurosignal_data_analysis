@@ -117,14 +117,31 @@ export function calculateWeightedGamma(gammaPz, gammaT7, gammaT8, wPz = 0.4, wT7
   return result;
 }
 
-// Calculate FAA: ln(AF4_Alpha) - ln(AF3_Alpha)
+// =========================================
+// NEURO-CALIBRATED EEG SYNCHRONY SCALING
+// =========================================
+/**
+ * Maps raw correlation r [-1, 1] to a 0-100 synchrony score using an EEG hyperscanning sigmoid curve.
+ * In neuroscience, r >= 0.20 indicates significant synchrony, r >= 0.35 is very high.
+ */
+export function corrToNeuroScore(r) {
+  if (r === undefined || r === null || isNaN(r)) return 50;
+  const clamped = Math.max(-1, Math.min(1, r));
+  const k = 10;
+  const x0 = 0.08;
+  const sigmoid = 1 / (1 + Math.exp(-k * (clamped - x0)));
+  const score = sigmoid * 100;
+  return Math.max(0, Math.min(100, Math.round(score * 10) / 10));
+}
+
+// Frontal Alpha Asymmetry: ln(AF4_Alpha) - ln(AF3_Alpha)
 export function calculateFAA(af3, af4) {
   if (af3 <= 0 || af4 <= 0) return 0; // Prevent log(0) or negative
   return Math.log(af4) - Math.log(af3);
 }
 
 // Calculate R_Avoidance (Original discrete ratio)
-export function calculateRAvoidance(af3A, af4A, af3B, af4B) {
+export function calculateRAvoidance(af3A, af4A, af3B, af4B, threshold = -0.15) {
   if (!af3A || af3A.length === 0) return 0;
   let avoidanceCount = 0;
   const T = Math.min(af3A.length, af4A.length, af3B.length, af4B.length);
@@ -134,15 +151,16 @@ export function calculateRAvoidance(af3A, af4A, af3B, af4B) {
     const faaA = calculateFAA(af3A[t], af4A[t]);
     const faaB = calculateFAA(af3B[t], af4B[t]);
     
-    if (faaA < 0 || faaB < 0) {
+    // Only count as avoidance when there is a significant negative frontal bias
+    if (faaA < threshold || faaB < threshold) {
       avoidanceCount++;
     }
   }
   return avoidanceCount / T;
 }
 
-// Continuous FAA Avoidance Penalty (Combines frequency + intensity)
-export function calculateContinuousAvoidancePenalty(af3A, af4A, af3B, af4B, wFaa = 0.25) {
+// Continuous FAA Avoidance Penalty (Combines frequency + intensity with threshold)
+export function calculateContinuousAvoidancePenalty(af3A, af4A, af3B, af4B, wFaa = 0.25, threshold = -0.10) {
   const T = Math.min(af3A?.length || 0, af4A?.length || 0, af3B?.length || 0, af4B?.length || 0);
   if (T === 0) return { rAvoidance: 0, penaltyFactor: 0, avgFaaA: 0, avgFaaB: 0 };
 
@@ -159,11 +177,11 @@ export function calculateContinuousAvoidancePenalty(af3A, af4A, af3B, af4B, wFaa
     sumFaaB += faaB;
 
     let isAvoid = false;
-    if (faaA < 0) {
+    if (faaA < threshold) {
       totalNegativeMagA += Math.abs(faaA);
       isAvoid = true;
     }
-    if (faaB < 0) {
+    if (faaB < threshold) {
       totalNegativeMagB += Math.abs(faaB);
       isAvoid = true;
     }
@@ -172,10 +190,9 @@ export function calculateContinuousAvoidancePenalty(af3A, af4A, af3B, af4B, wFaa
 
   const rAvoidance = avoidanceCount / T;
   const avgNegativeIntensity = (totalNegativeMagA + totalNegativeMagB) / (2 * T);
-  // Softplus/Sigmoidal smooth scaling for intensity
   const intensityPenalty = Math.log(1 + Math.exp(avgNegativeIntensity * 2)) * 0.5;
 
-  // Composite avoidance penalty factor (0 to 1 scale)
+  // Composite avoidance penalty factor (0 to 1 scale, soft-clamped)
   const penaltyFactor = Math.min(1.0, wFaa * (0.6 * rAvoidance + 0.4 * Math.min(1, intensityPenalty)));
 
   return {
@@ -186,11 +203,11 @@ export function calculateContinuousAvoidancePenalty(af3A, af4A, af3B, af4B, wFaa
   };
 }
 
-// Calculate Friendship Score (Legacy compatibility)
+// Calculate Friendship Score (Legacy compatibility with neuro-calibration)
 export function calculateFriendshipScore(pGamma, rAvoidance, wSync = 1.0, wFaa = 0.25) {
-  const pNormalized = (pGamma + 1) / 2;
-  const rawScore = (wSync * pNormalized) * (1 - (wFaa * rAvoidance)) * 100;
-  return Math.max(0, Math.min(100, rawScore));
+  const baseScore = corrToNeuroScore(pGamma);
+  const rawScore = (wSync * baseScore) * (1 - (wFaa * rAvoidance * 0.5));
+  return Math.max(0, Math.min(100, Math.round(rawScore * 10) / 10));
 }
 
 // ================================================================
@@ -227,21 +244,25 @@ export function calculateImprovedSyncScore({
 
   // Ensemble between Integrated Gamma correlation and Cross-Channel average
   const ensembleGammaSync = (multiGammaCorr * 0.6) + (channelZAvg * 0.4);
-  const normalizedSync = (ensembleGammaSync + 1) / 2; // Map [-1, 1] to [0, 1]
+  
+  // Base Neuro-calibrated EEG synchrony score (0 ~ 100)
+  const baseGammaScore = corrToNeuroScore(ensembleGammaSync);
 
-  // Avoidance discount
-  const syncAfterAvoidance = normalizedSync * Math.max(0, (1 - avoidancePenalty));
+  // Avoidance discount (Max 15% reduction for natural preservation)
+  const discountFactor = Math.max(0.85, 1 - avoidancePenalty * 0.4);
+  const syncAfterAvoidance = baseGammaScore * discountFactor;
 
-  // Multi-modal fusion with Emotional harmony (Cosine similarity)
-  const normalizedEmotion = Math.max(0, Math.min(1, (emotionHarmony + 1) / 2));
-  const rawFinalScore = (wSync * syncAfterAvoidance + wEmotion * normalizedEmotion) * 100;
+  // Multi-modal fusion with Emotional harmony (Cosine similarity, scaled 0~100)
+  const emotionScore = Math.max(0, Math.min(100, emotionHarmony * 100));
+  const rawFinalScore = (wSync * syncAfterAvoidance + wEmotion * emotionScore);
 
   return {
-    score: Math.max(0, Math.min(100, rawFinalScore)),
+    score: Math.max(0, Math.min(100, Math.round(rawFinalScore * 10) / 10)),
+    baseGammaScore,
     ensembleGammaSync,
-    normalizedSync,
     syncAfterAvoidance,
-    channelZAvg
+    channelZAvg,
+    emotionScore
   };
 }
 
@@ -466,14 +487,14 @@ export function calculateTimeWindowSynchrony(gammaA, gammaB, windowSize = 30, st
     const subA = gammaA.slice(start, end);
     const subB = gammaB.slice(start, end);
     const corr = spearmanCorrelation(subA, subB);
-    const syncPercent = Math.max(0, Math.min(100, Math.round(((corr + 1) / 2) * 100)));
+    const syncPercent = corrToNeuroScore(corr);
     const centerTimeSec = Math.round(start + windowSize / 2);
 
     movingSyncCurve.push({
       timeSec: centerTimeSec,
       timeLabel: `${Math.floor(centerTimeSec / 60)}분 ${centerTimeSec % 60}초`,
-      syncScore: syncPercent,
-      corr
+      syncScore: Math.round(syncPercent),
+      corr: parseFloat(corr.toFixed(3))
     });
 
     if (syncPercent > maxWindowSync) {
@@ -499,14 +520,14 @@ export function calculateTimeWindowSynchrony(gammaA, gammaB, windowSize = 30, st
     const subA = gammaA.slice(segStart, segEnd);
     const subB = gammaB.slice(segStart, segEnd);
     const corr = spearmanCorrelation(subA, subB);
-    const syncScore = Math.max(0, Math.min(100, Math.round(((corr + 1) / 2) * 100)));
+    const syncScore = corrToNeuroScore(corr);
 
     minuteSegments.push({
       segmentIndex: m + 1,
       label: `${m}분 ~ ${m + 1}분 (${segStart}s ~ ${segEnd}s)`,
       startSec: segStart,
       endSec: segEnd,
-      syncScore,
+      syncScore: Math.round(syncScore),
       corr: parseFloat(corr.toFixed(3))
     });
   }
@@ -517,12 +538,12 @@ export function calculateTimeWindowSynchrony(gammaA, gammaB, windowSize = 30, st
     peakPeriod: {
       timeSec: peakTimeSec,
       timeLabel: `${Math.floor(peakTimeSec / 60)}분 ${peakTimeSec % 60}초 부근`,
-      score: maxWindowSync >= 0 ? maxWindowSync : 0
+      score: maxWindowSync >= 0 ? Math.round(maxWindowSync) : 0
     },
     lowestPeriod: {
       timeSec: lowestTimeSec,
       timeLabel: `${Math.floor(lowestTimeSec / 60)}분 ${lowestTimeSec % 60}초 부근`,
-      score: minWindowSync <= 100 ? minWindowSync : 0
+      score: minWindowSync <= 100 ? Math.round(minWindowSync) : 0
     }
   };
 }

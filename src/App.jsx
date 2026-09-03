@@ -11,8 +11,10 @@ import {
   calculateFriendshipScore, filterEOGOutliers, timeLaggedSpearmanCorrelation, 
   timeLaggedPearsonCorrelation, normalizeLog, calculateWeightedGamma, 
   calculateContinuousAvoidancePenalty, calculateCosineSimilarity, 
-  calculateImprovedSyncScore, runTriRegionPipeline, calculateTimeWindowSynchrony
+  calculateImprovedSyncScore, runTriRegionPipeline, calculateTimeWindowSynchrony,
+  corrToNeuroScore
 } from './utils/math';
+import { DEFAULT_SAMPLE_A, DEFAULT_SAMPLE_B } from './utils/sampleData';
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -104,42 +106,13 @@ function sampleData(arr, maxPoints = 120) {
   return arr.filter((_, i) => i % step === 0);
 }
 
-// Built-in Sample Datasets matching the real 37-column EEG structure
-const DEFAULT_SAMPLE_A = [
-  { timestamp: "2026-09-03 14:44:42.722300", delta: 71.12, theta: 9.42, alpha: 7.83, beta: 8.42, gamma: 7.86, focus: 0.2055, engagement: 0.4830, interest: 0.7482, excitement: 0.7252, stress: 0.4310, relaxation: 0.4325, AF3_delta: 54.52, AF3_theta: 10.16, AF3_alpha: 7.53, AF3_beta: 8.06, AF3_gamma: 7.45, T7_delta: 65.39, T7_theta: 15.98, T7_alpha: 7.51, T7_beta: 17.07, T7_gamma: 17.43, Pz_delta: 126.14, Pz_theta: 23.81, Pz_alpha: 18.77, Pz_beta: 13.65, Pz_gamma: 8.52, T8_delta: 49.30, T8_theta: 10.38, T8_alpha: 7.18, T8_beta: 10.59, T8_gamma: 7.89, AF4_delta: 70.01, AF4_theta: 8.95, AF4_alpha: 10.18, AF4_beta: 9.50, AF4_gamma: 8.55 },
-  { timestamp: "2026-09-03 14:44:43.722200", delta: 133.31, theta: 10.01, alpha: 5.38, beta: 9.12, gamma: 7.07, focus: 0.2593, engagement: 0.1764, interest: 0.6914, excitement: 0.7398, stress: 0.3880, relaxation: 0.4016, AF3_delta: 231.40, AF3_theta: 27.53, AF3_alpha: 11.62, AF3_beta: 13.50, AF3_gamma: 7.78, T7_delta: 98.30, T7_theta: 4.56, T7_alpha: 6.60, T7_beta: 8.07, T7_gamma: 12.70, Pz_delta: 77.39, Pz_theta: 16.23, Pz_alpha: 6.51, Pz_beta: 9.46, Pz_gamma: 7.16, T8_delta: 102.74, T8_theta: 12.10, T8_alpha: 8.80, T8_beta: 10.83, T8_gamma: 9.32, AF4_delta: 189.11, AF4_theta: 20.61, AF4_alpha: 6.22, AF4_beta: 12.93, AF4_gamma: 10.95 },
-  { timestamp: "2026-09-03 14:44:44.721500", delta: 20.69, theta: 9.14, alpha: 9.97, beta: 11.26, gamma: 7.54, focus: 0.3073, engagement: 0.2618, interest: 0.6177, excitement: 0.7438, stress: 0.4093, relaxation: 0.4485, AF3_delta: 15.50, AF3_theta: 13.72, AF3_alpha: 12.73, AF3_beta: 12.47, AF3_gamma: 8.55, T7_delta: 27.98, T7_theta: 8.85, T7_alpha: 10.97, T7_beta: 13.62, T7_gamma: 10.99, Pz_delta: 42.08, Pz_theta: 9.48, Pz_alpha: 4.90, Pz_beta: 10.92, Pz_gamma: 6.47, T8_delta: 26.65, T8_theta: 10.32, T8_alpha: 11.20, T8_beta: 12.73, T8_gamma: 7.47, AF4_delta: 16.51, AF4_theta: 12.84, AF4_alpha: 13.42, AF4_beta: 16.02, AF4_gamma: 9.87 },
-  { timestamp: "2026-09-03 14:44:45.721700", delta: 23.63, theta: 10.51, alpha: 9.15, beta: 11.24, gamma: 11.32, focus: 0.3408, engagement: 0.5284, interest: 0.5702, excitement: 0.7068, stress: 0.4346, relaxation: 0.4594, AF3_delta: 51.33, AF3_theta: 13.12, AF3_alpha: 11.17, AF3_beta: 11.94, AF3_gamma: 14.58, T7_delta: 20.56, T7_theta: 11.04, T7_alpha: 10.56, T7_beta: 12.09, T7_gamma: 11.79, Pz_delta: 14.96, Pz_theta: 9.66, Pz_alpha: 8.25, Pz_beta: 13.89, Pz_gamma: 10.13, T8_delta: 11.18, T8_theta: 13.61, T8_alpha: 9.16, T8_beta: 15.93, T8_gamma: 14.36, AF4_delta: 43.77, AF4_theta: 14.84, AF4_alpha: 10.97, AF4_beta: 13.35, AF4_gamma: 12.57 },
-  { timestamp: "2026-09-03 14:44:46.721400", delta: 20.07, theta: 9.38, alpha: 8.48, beta: 7.54, gamma: 5.43, focus: 0.3704, engagement: 0.5148, interest: 0.5133, excitement: 0.6305, stress: 0.4346, relaxation: 0.4346, AF3_delta: 27.09, AF3_theta: 17.79, AF3_alpha: 10.45, AF3_beta: 13.29, AF3_gamma: 12.26, T7_delta: 13.50, T7_theta: 13.69, T7_alpha: 9.91, T7_beta: 9.98, T7_gamma: 7.75, Pz_delta: 48.09, Pz_theta: 14.58, Pz_alpha: 9.79, Pz_beta: 7.40, Pz_gamma: 5.21, T8_delta: 26.39, T8_theta: 8.70, T8_alpha: 7.09, T8_beta: 12.35, T8_gamma: 9.72, AF4_delta: 22.85, AF4_theta: 8.73, AF4_alpha: 8.56, AF4_beta: 15.22, AF4_gamma: 13.00 },
-  { timestamp: "2026-09-03 14:44:47.721200", delta: 88.51, theta: 23.20, alpha: 12.55, beta: 13.24, gamma: 8.89, focus: 0.3963, engagement: 0.4898, interest: 0.4938, excitement: 0.5546, stress: 0.4478, relaxation: 0.4491, AF3_delta: 153.86, AF3_theta: 40.37, AF3_alpha: 14.80, AF3_beta: 17.51, AF3_gamma: 16.26, T7_delta: 83.61, T7_theta: 18.56, T7_alpha: 10.73, T7_beta: 17.22, T7_gamma: 11.13, Pz_delta: 133.81, Pz_theta: 20.71, Pz_alpha: 15.63, Pz_beta: 11.94, Pz_gamma: 9.49, T8_delta: 32.72, T8_theta: 17.44, T8_alpha: 14.22, T8_beta: 19.87, T8_gamma: 13.90, AF4_delta: 104.92, AF4_theta: 29.52, AF4_alpha: 13.20, AF4_beta: 17.13, AF4_gamma: 12.13 },
-  { timestamp: "2026-09-03 14:44:48.721300", delta: 82.28, theta: 36.50, alpha: 8.15, beta: 10.80, gamma: 7.59, focus: 0.3454, engagement: 0.4375, interest: 0.5112, excitement: 0.5238, stress: 0.5257, relaxation: 0.5302, AF3_delta: 120.91, AF3_theta: 45.89, AF3_alpha: 9.96, AF3_beta: 18.50, AF3_gamma: 17.41, T7_delta: 93.05, T7_theta: 24.84, T7_alpha: 5.67, T7_beta: 16.38, T7_gamma: 12.16, Pz_delta: 98.17, Pz_theta: 50.17, Pz_alpha: 11.41, Pz_beta: 12.88, Pz_gamma: 5.94, T8_delta: 58.42, T8_theta: 33.57, T8_alpha: 10.13, T8_beta: 14.73, T8_gamma: 9.94, AF4_delta: 82.07, AF4_theta: 35.86, AF4_alpha: 12.16, AF4_beta: 12.86, AF4_gamma: 11.06 },
-  { timestamp: "2026-09-03 14:44:49.721200", delta: 46.00, theta: 25.55, alpha: 14.23, beta: 25.28, gamma: 29.49, focus: 0.2597, engagement: 0.4567, interest: 0.5612, excitement: 0.5146, stress: 0.5374, relaxation: 0.5668, AF3_delta: 45.34, AF3_theta: 19.93, AF3_alpha: 10.78, AF3_beta: 27.31, AF3_gamma: 28.15, T7_delta: 62.71, T7_theta: 17.04, T7_alpha: 5.94, T7_beta: 24.90, T7_gamma: 27.69, Pz_delta: 110.18, Pz_theta: 119.64, Pz_alpha: 62.39, Pz_beta: 49.46, Pz_gamma: 35.75, T8_delta: 35.74, T8_theta: 17.48, T8_alpha: 12.47, T8_beta: 27.99, T8_gamma: 32.32, AF4_delta: 46.96, AF4_theta: 16.81, AF4_alpha: 9.28, AF4_beta: 27.29, AF4_gamma: 30.56 },
-  { timestamp: "2026-09-03 14:44:50.720600", delta: 95.33, theta: 21.50, alpha: 14.08, beta: 13.79, gamma: 10.06, focus: 0.2192, engagement: 0.5514, interest: 0.6034, excitement: 0.5108, stress: 0.5360, relaxation: 0.6073, AF3_delta: 96.09, AF3_theta: 17.29, AF3_alpha: 15.47, AF3_beta: 16.01, AF3_gamma: 14.15, T7_delta: 90.07, T7_theta: 7.00, T7_alpha: 9.28, T7_beta: 14.69, T7_gamma: 16.36, Pz_delta: 205.58, Pz_theta: 83.29, Pz_alpha: 38.79, Pz_beta: 31.44, Pz_gamma: 13.18, T8_delta: 53.18, T8_theta: 13.69, T8_alpha: 6.74, T8_beta: 18.45, T8_gamma: 15.06, AF4_delta: 76.88, AF4_theta: 16.51, AF4_alpha: 15.42, AF4_beta: 17.17, AF4_gamma: 13.96 },
-  { timestamp: "2026-09-03 14:44:51.719600", delta: 110.07, theta: 14.24, alpha: 8.51, beta: 14.05, gamma: 12.64, focus: 0.2379, engagement: 0.4906, interest: 0.6778, excitement: 0.5243, stress: 0.5164, relaxation: 0.5672, AF3_delta: 96.62, AF3_theta: 25.55, AF3_alpha: 10.91, AF3_beta: 16.22, AF3_gamma: 19.47, T7_delta: 76.25, T7_theta: 13.48, T7_alpha: 7.08, T7_beta: 18.43, T7_gamma: 14.33, Pz_delta: 199.55, Pz_theta: 56.79, Pz_alpha: 22.24, Pz_beta: 17.91, Pz_gamma: 20.40, T8_delta: 117.82, T8_theta: 6.03, T8_alpha: 5.51, T8_beta: 19.16, T8_gamma: 13.50, AF4_delta: 80.71, AF4_theta: 22.14, AF4_alpha: 6.85, AF4_beta: 15.60, AF4_gamma: 16.68 },
-  { timestamp: "2026-09-03 14:44:52.719100", delta: 65.91, theta: 13.57, alpha: 8.82, beta: 12.62, gamma: 10.90, focus: 0.2540, engagement: 0.4936, interest: 0.7497, excitement: 0.5424, stress: 0.4546, relaxation: 0.4708, AF3_delta: 68.24, AF3_theta: 18.59, AF3_alpha: 10.10, AF3_beta: 13.39, AF3_gamma: 10.21, T7_delta: 42.00, T7_theta: 14.54, T7_alpha: 7.59, T7_beta: 22.51, T7_gamma: 15.40, Pz_delta: 171.21, Pz_theta: 31.42, Pz_alpha: 13.88, Pz_beta: 13.42, Pz_gamma: 13.75, T8_delta: 29.12, T8_theta: 11.06, T8_alpha: 9.84, T8_beta: 19.44, T8_gamma: 14.40, AF4_delta: 54.32, AF4_theta: 16.46, AF4_alpha: 9.54, AF4_beta: 15.80, AF4_gamma: 12.97 }
-];
-
-const DEFAULT_SAMPLE_B = [
-  { timestamp: "2026-09-03 14:44:42.722300", delta: 68.45, theta: 9.12, alpha: 7.53, beta: 8.12, gamma: 7.66, focus: 0.2255, engagement: 0.5030, interest: 0.7282, excitement: 0.7052, stress: 0.4110, relaxation: 0.4525, AF3_delta: 52.32, AF3_theta: 9.86, AF3_alpha: 7.23, AF3_beta: 7.86, AF3_gamma: 7.25, T7_delta: 63.19, T7_theta: 15.28, T7_alpha: 7.21, T7_beta: 16.57, T7_gamma: 16.83, Pz_delta: 121.14, Pz_theta: 22.81, Pz_alpha: 18.17, Pz_beta: 13.15, Pz_gamma: 8.22, T8_delta: 47.30, T8_theta: 9.98, T8_alpha: 6.98, T8_beta: 10.19, T8_gamma: 7.69, AF4_delta: 67.01, AF4_theta: 8.65, AF4_alpha: 9.88, AF4_beta: 9.20, AF4_gamma: 8.25 },
-  { timestamp: "2026-09-03 14:44:43.722200", delta: 128.31, theta: 9.71, alpha: 5.18, beta: 8.82, gamma: 6.87, focus: 0.2793, engagement: 0.1964, interest: 0.6714, excitement: 0.7198, stress: 0.3680, relaxation: 0.4216, AF3_delta: 224.40, AF3_theta: 26.53, AF3_alpha: 11.22, AF3_beta: 13.10, AF3_gamma: 7.58, T7_delta: 94.30, T7_theta: 4.36, T7_alpha: 6.40, T7_beta: 7.87, T7_gamma: 12.30, Pz_delta: 74.39, Pz_theta: 15.73, Pz_alpha: 6.31, Pz_beta: 9.16, Pz_gamma: 6.96, T8_delta: 99.74, T8_theta: 11.70, T8_alpha: 8.50, T8_beta: 10.43, T8_gamma: 9.02, AF4_delta: 183.11, AF4_theta: 19.81, AF4_alpha: 5.92, AF4_beta: 12.53, AF4_gamma: 10.65 },
-  { timestamp: "2026-09-03 14:44:44.721500", delta: 21.69, theta: 9.34, alpha: 9.67, beta: 10.96, gamma: 7.34, focus: 0.3273, engagement: 0.2818, interest: 0.6377, excitement: 0.7238, stress: 0.3893, relaxation: 0.4685, AF3_delta: 16.50, AF3_theta: 13.22, AF3_alpha: 12.33, AF3_beta: 12.17, AF3_gamma: 8.25, T7_delta: 26.98, T7_theta: 8.55, T7_alpha: 10.67, T7_beta: 13.22, T7_gamma: 10.69, Pz_delta: 40.08, Pz_theta: 9.18, Pz_alpha: 4.70, Pz_beta: 10.62, Pz_gamma: 6.27, T8_delta: 25.65, T8_theta: 9.92, T8_alpha: 10.90, T8_beta: 12.33, T8_gamma: 7.27, AF4_delta: 17.51, AF4_theta: 12.44, AF4_alpha: 13.12, AF4_beta: 15.62, AF4_gamma: 9.57 },
-  { timestamp: "2026-09-03 14:44:45.721700", delta: 24.63, theta: 10.21, alpha: 8.85, beta: 10.94, gamma: 11.02, focus: 0.3608, engagement: 0.5484, interest: 0.5902, excitement: 0.6868, stress: 0.4146, relaxation: 0.4794, AF3_delta: 49.33, AF3_theta: 12.82, AF3_alpha: 10.87, AF3_beta: 11.64, AF3_gamma: 14.28, T7_delta: 21.56, T7_theta: 10.74, T7_alpha: 10.26, T7_beta: 11.79, T7_gamma: 11.49, Pz_delta: 15.96, Pz_theta: 9.36, Pz_alpha: 7.95, Pz_beta: 13.59, Pz_gamma: 9.83, T8_delta: 12.18, T8_theta: 13.21, T8_alpha: 8.86, T8_beta: 15.53, T8_gamma: 14.06, AF4_delta: 41.77, AF4_theta: 14.44, AF4_alpha: 10.67, AF4_beta: 12.95, AF4_gamma: 12.27 },
-  { timestamp: "2026-09-03 14:44:46.721400", delta: 21.07, theta: 9.08, alpha: 8.18, beta: 7.24, gamma: 5.23, focus: 0.3904, engagement: 0.5348, interest: 0.5333, excitement: 0.6105, stress: 0.4146, relaxation: 0.4546, AF3_delta: 26.09, AF3_theta: 17.29, AF3_alpha: 10.15, AF3_beta: 12.99, AF3_gamma: 11.96, T7_delta: 14.50, T7_theta: 13.29, T7_alpha: 9.61, T7_beta: 9.68, T7_gamma: 7.45, Pz_delta: 46.09, Pz_theta: 14.18, Pz_alpha: 9.49, Pz_beta: 7.10, Pz_gamma: 4.91, T8_delta: 25.39, T8_theta: 8.40, T8_alpha: 6.79, T8_beta: 11.95, T8_gamma: 9.42, AF4_delta: 21.85, AF4_theta: 8.43, AF4_alpha: 8.26, AF4_beta: 14.82, AF4_gamma: 12.70 },
-  { timestamp: "2026-09-03 14:44:47.721200", delta: 85.51, theta: 22.60, alpha: 12.15, beta: 12.84, gamma: 8.59, focus: 0.4163, engagement: 0.5098, interest: 0.5138, excitement: 0.5346, stress: 0.4278, relaxation: 0.4691, AF3_delta: 149.86, AF3_theta: 39.37, AF3_alpha: 14.40, AF3_beta: 17.11, AF3_gamma: 15.86, T7_delta: 81.61, T7_theta: 18.16, T7_alpha: 10.43, T7_beta: 16.82, T7_gamma: 10.83, Pz_delta: 129.81, Pz_theta: 20.21, Pz_alpha: 15.23, Pz_beta: 11.54, Pz_gamma: 9.19, T8_delta: 31.72, T8_theta: 16.94, T8_alpha: 13.82, T8_beta: 19.37, T8_gamma: 13.50, AF4_delta: 101.92, AF4_theta: 28.92, AF4_alpha: 12.90, AF4_beta: 16.73, AF4_gamma: 11.83 },
-  { timestamp: "2026-09-03 14:44:48.721300", delta: 79.28, theta: 35.50, alpha: 7.85, beta: 10.40, gamma: 7.29, focus: 0.3654, engagement: 0.4575, interest: 0.5312, excitement: 0.5038, stress: 0.5057, relaxation: 0.5502, AF3_delta: 116.91, AF3_theta: 44.89, AF3_alpha: 9.66, AF3_beta: 18.10, AF3_gamma: 17.01, T7_delta: 90.05, T7_theta: 24.34, T7_alpha: 5.37, T7_beta: 15.98, T7_gamma: 11.86, Pz_delta: 95.17, Pz_theta: 49.17, Pz_alpha: 11.11, Pz_beta: 12.48, Pz_gamma: 5.64, T8_delta: 56.42, T8_theta: 32.87, T8_alpha: 9.83, T8_beta: 14.33, T8_gamma: 9.64, AF4_delta: 79.07, AF4_theta: 35.16, AF4_alpha: 11.86, AF4_beta: 12.46, AF4_gamma: 10.76 },
-  { timestamp: "2026-09-03 14:44:49.721200", delta: 44.00, theta: 24.85, alpha: 13.83, beta: 24.78, gamma: 28.89, focus: 0.2797, engagement: 0.4767, interest: 0.5812, excitement: 0.4946, stress: 0.5174, relaxation: 0.5868, AF3_delta: 43.34, AF3_theta: 19.33, AF3_alpha: 10.48, AF3_beta: 26.81, AF3_gamma: 27.65, T7_delta: 60.71, T7_theta: 16.54, T7_alpha: 5.64, T7_beta: 24.40, T7_gamma: 27.19, Pz_delta: 107.18, Pz_theta: 116.64, Pz_alpha: 61.19, Pz_beta: 48.86, Pz_gamma: 35.15, T8_delta: 34.74, T8_theta: 17.08, T8_alpha: 12.17, T8_beta: 27.49, T8_gamma: 31.72, AF4_delta: 44.96, AF4_theta: 16.31, AF4_alpha: 8.98, AF4_beta: 26.79, AF4_gamma: 29.96 },
-  { timestamp: "2026-09-03 14:44:50.720600", delta: 92.33, theta: 20.90, alpha: 13.68, beta: 13.39, gamma: 9.76, focus: 0.2392, engagement: 0.5714, interest: 0.6234, excitement: 0.4908, stress: 0.5160, relaxation: 0.6273, AF3_delta: 93.09, AF3_theta: 16.79, AF3_alpha: 15.07, AF3_beta: 15.61, AF3_gamma: 13.75, T7_delta: 87.07, T7_theta: 6.70, T7_alpha: 8.98, T7_beta: 14.29, T7_gamma: 15.86, Pz_delta: 201.58, Pz_theta: 81.29, Pz_alpha: 37.99, Pz_beta: 30.84, Pz_gamma: 12.78, T8_delta: 51.18, T8_theta: 13.29, T8_alpha: 6.44, T8_beta: 18.05, T8_gamma: 14.66, AF4_delta: 74.88, AF4_theta: 16.01, AF4_alpha: 15.02, AF4_beta: 16.67, AF4_gamma: 13.56 },
-  { timestamp: "2026-09-03 14:44:51.719600", delta: 106.07, theta: 13.84, alpha: 8.21, beta: 13.65, gamma: 12.24, focus: 0.2579, engagement: 0.5106, interest: 0.6978, excitement: 0.5043, stress: 0.4964, relaxation: 0.5872, AF3_delta: 93.62, AF3_theta: 24.85, AF3_alpha: 10.61, AF3_beta: 15.82, AF3_gamma: 19.07, T7_delta: 73.25, T7_theta: 13.08, T7_alpha: 6.78, T7_beta: 17.93, T7_gamma: 13.93, Pz_delta: 195.55, Pz_theta: 55.19, Pz_alpha: 21.74, Pz_beta: 17.41, Pz_gamma: 19.90, T8_delta: 114.82, T8_theta: 5.83, T8_alpha: 5.21, T8_beta: 18.66, T8_gamma: 13.10, AF4_delta: 77.71, AF4_theta: 21.64, AF4_alpha: 6.55, AF4_beta: 15.10, AF4_gamma: 16.28 },
-  { timestamp: "2026-09-03 14:44:52.719100", delta: 63.91, theta: 13.17, alpha: 8.52, beta: 12.22, gamma: 10.50, focus: 0.2740, engagement: 0.5136, interest: 0.7697, excitement: 0.5224, stress: 0.4346, relaxation: 0.4908, AF3_delta: 65.24, AF3_theta: 18.09, AF3_alpha: 9.80, AF3_beta: 12.99, AF3_gamma: 9.81, T7_delta: 40.00, T7_theta: 14.14, T7_alpha: 7.29, T7_beta: 21.91, T7_gamma: 14.90, Pz_delta: 167.21, Pz_theta: 30.72, Pz_alpha: 13.48, Pz_beta: 12.92, Pz_gamma: 13.35, T8_delta: 27.12, T8_theta: 10.66, T8_alpha: 9.54, T8_beta: 18.94, T8_gamma: 13.90, AF4_delta: 51.32, AF4_theta: 15.96, AF4_alpha: 9.24, AF4_beta: 15.30, AF4_gamma: 12.57 }
-];
-
 function App() {
   const [theme, setTheme] = useState('light');
   
-  const [fileA, setFileA] = useState(null);
-  const [fileB, setFileB] = useState(null);
-  const [dataA, setDataA] = useState([]);
-  const [dataB, setDataB] = useState([]);
+  const [fileA, setFileA] = useState({ name: '0903_고권석_5분 영상 동시 신청.csv', count: 1, totalRows: DEFAULT_SAMPLE_A.length });
+  const [fileB, setFileB] = useState({ name: '0903_문경수_5분 영상 동시 신청.csv', count: 1, totalRows: DEFAULT_SAMPLE_B.length });
+  const [dataA, setDataA] = useState(DEFAULT_SAMPLE_A);
+  const [dataB, setDataB] = useState(DEFAULT_SAMPLE_B);
   
   const [nameA, setNameA] = useState('고권석');
   const [nameB, setNameB] = useState('문경수');
@@ -181,6 +154,11 @@ function App() {
     }
   }, [theme]);
 
+  // Initial calculation on mount
+  useEffect(() => {
+    computeAnalysis(DEFAULT_SAMPLE_A, DEFAULT_SAMPLE_B);
+  }, []);
+
   // Recalculate analysis when weights or toggles change
   useEffect(() => {
     if (dataA.length && dataB.length && results) {
@@ -206,13 +184,10 @@ function App() {
   const loadSampleData = () => {
     setDataA(DEFAULT_SAMPLE_A);
     setDataB(DEFAULT_SAMPLE_B);
-    setFileA({ name: 'eeg_personA_37col.csv' });
-    setFileB({ name: 'eeg_personB_37col.csv' });
+    setFileA({ name: '0903_고권석_5분 영상 동시 신청.csv', count: 1, totalRows: DEFAULT_SAMPLE_A.length });
+    setFileB({ name: '0903_문경수_5분 영상 동시 신청.csv', count: 1, totalRows: DEFAULT_SAMPLE_B.length });
     setError('');
-    setTimeout(() => {
-      // Trigger analyze directly
-      computeAnalysis(DEFAULT_SAMPLE_A, DEFAULT_SAMPLE_B);
-    }, 50);
+    computeAnalysis(DEFAULT_SAMPLE_A, DEFAULT_SAMPLE_B);
   };
 
   // Multiple File Upload Handler (Concatenates multi-part CSV files)
@@ -1077,10 +1052,10 @@ function App() {
                           <span className="stat-weight">가중치 {Math.round(wPz * 100)}%</span>
                         </div>
                         <div className="stat-val-bar">
-                          <div className="stat-bar-fill pz-fill" style={{ width: `${Math.max(0, Math.min(100, ((results.channelCorrs.rPz + 1) / 2) * 100))}%` }} />
+                          <div className="stat-bar-fill pz-fill" style={{ width: `${Math.round(corrToNeuroScore(results.channelCorrs.rPz))}%` }} />
                         </div>
                         <div className="stat-val-text">
-                          상관계수 $r = {results.channelCorrs.rPz.toFixed(3)}$ (동조율 {Math.round(((results.channelCorrs.rPz + 1) / 2) * 100)}점)
+                          상관계수 $r = {results.channelCorrs.rPz.toFixed(3)}$ (동조율 {Math.round(corrToNeuroScore(results.channelCorrs.rPz))}점)
                         </div>
                       </div>
 
@@ -1091,10 +1066,10 @@ function App() {
                           <span className="stat-weight">가중치 {Math.round(wT7 * 100)}%</span>
                         </div>
                         <div className="stat-val-bar">
-                          <div className="stat-bar-fill t7-fill" style={{ width: `${Math.max(0, Math.min(100, ((results.channelCorrs.rT7 + 1) / 2) * 100))}%` }} />
+                          <div className="stat-bar-fill t7-fill" style={{ width: `${Math.round(corrToNeuroScore(results.channelCorrs.rT7))}%` }} />
                         </div>
                         <div className="stat-val-text">
-                          상관계수 $r = {results.channelCorrs.rT7.toFixed(3)}$ (동조율 {Math.round(((results.channelCorrs.rT7 + 1) / 2) * 100)}점)
+                          상관계수 $r = {results.channelCorrs.rT7.toFixed(3)}$ (동조율 {Math.round(corrToNeuroScore(results.channelCorrs.rT7))}점)
                         </div>
                       </div>
 
@@ -1105,10 +1080,10 @@ function App() {
                           <span className="stat-weight">가중치 {Math.round(wT8 * 100)}%</span>
                         </div>
                         <div className="stat-val-bar">
-                          <div className="stat-bar-fill t8-fill" style={{ width: `${Math.max(0, Math.min(100, ((results.channelCorrs.rT8 + 1) / 2) * 100))}%` }} />
+                          <div className="stat-bar-fill t8-fill" style={{ width: `${Math.round(corrToNeuroScore(results.channelCorrs.rT8))}%` }} />
                         </div>
                         <div className="stat-val-text">
-                          상관계수 $r = {results.channelCorrs.rT8.toFixed(3)}$ (동조율 {Math.round(((results.channelCorrs.rT8 + 1) / 2) * 100)}점)
+                          상관계수 $r = {results.channelCorrs.rT8.toFixed(3)}$ (동조율 {Math.round(corrToNeuroScore(results.channelCorrs.rT8))}점)
                         </div>
                       </div>
 
@@ -1350,50 +1325,50 @@ function App() {
 
             {/* EXPERIMENTAL STEPS */}
             <div style={{ marginBottom: '3.5rem' }}>
-              <h3 className="chart-title" style={{ marginBottom: '1.5rem' }}>실험 진행 절차 (총 20분 소요)</h3>
+              <h3 className="chart-title" style={{ marginBottom: '1.5rem' }}>실험 진행 절차 (총 16분 소요)</h3>
               
               <div className="protocol-timeline">
-                <div className="protocol-step-card sensor">
-                  <div className="step-time-badge">
-                    <div className="step-time-title">STEP 01</div>
-                    <div className="step-time-duration">00:00 ~ 05:00 (5분)</div>
-                  </div>
-                  <div>
-                    <h4 className="step-content-title"><Cpu size={20} style={{ color: 'var(--accent-teal)' }} /> 센서 부착 및 3영역 신호 품질 점검</h4>
-                    <p className="step-content-desc">AF3, AF4, T7, T8, Pz 5개 채널의 접촉 임피던스를 확인하고 센서 노이즈를 보정합니다.</p>
-                  </div>
-                </div>
-
                 <div className="protocol-step-card baseline">
                   <div className="step-time-badge">
-                    <div className="step-time-title">STEP 02</div>
-                    <div className="step-time-duration">05:00 ~ 08:00 (3분)</div>
+                    <div className="step-time-title">STEP 01</div>
+                    <div className="step-time-duration">00:00 ~ 03:00 (3분)</div>
                   </div>
                   <div>
-                    <h4 className="step-content-title"><Zap size={20} style={{ color: 'var(--accent-blue)' }} /> 1차 베이스라인 (휴식기) 측정</h4>
-                    <p className="step-content-desc">눈을 감거나 편안히 응시하며 각 개인의 기저 뇌파 주파수 특성을 기록합니다.</p>
+                    <h4 className="step-content-title"><Zap size={20} style={{ color: 'var(--accent-blue)' }} /> 3분 베이스라인(Baseline) 안정화 측정</h4>
+                    <p className="step-content-desc">AF3, AF4, T7, T8, Pz 5개 채널의 접촉 임피던스를 확인하고, 편안한 안정 상태에서 각 개인의 기저 뇌파 주파수 특성을 기록합니다.</p>
                   </div>
                 </div>
 
                 <div className="protocol-step-card interaction">
                   <div className="step-time-badge">
-                    <div className="step-time-title">STEP 03</div>
-                    <div className="step-time-duration">08:00 ~ 15:00 (7분)</div>
+                    <div className="step-time-title">STEP 02</div>
+                    <div className="step-time-duration">03:00 ~ 08:00 (5분)</div>
                   </div>
                   <div>
-                    <h4 className="step-content-title"><Activity size={20} style={{ color: 'var(--accent-purple)' }} /> 1차 대화 세션 (스몰 토크 및 주제 토론)</h4>
-                    <p className="step-content-desc">자연스러운 대화를 진행하며 언어(T7), 공감(T8), 인지(Pz) 영역의 감마파 동기화를 실시간 추출합니다.</p>
+                    <h4 className="step-content-title"><Activity size={20} style={{ color: 'var(--accent-purple)' }} /> 1차 실험 측정 (5분 영상 동시 시청 및 상호작용)</h4>
+                    <p className="step-content-desc">동일한 시각·청각 자극(5분 영상)을 동시에 시청하며 인지(Pz), 언어(T7), 공감(T8) 3개 핵심 영역의 감마파 실시간 동기화를 수집합니다.</p>
+                  </div>
+                </div>
+
+                <div className="protocol-step-card sensor">
+                  <div className="step-time-badge">
+                    <div className="step-time-title">STEP 03</div>
+                    <div className="step-time-duration">08:00 ~ 11:00 (3분)</div>
+                  </div>
+                  <div>
+                    <h4 className="step-content-title"><Cpu size={20} style={{ color: 'var(--accent-teal)' }} /> 중간 휴식 시간 (Rest Period)</h4>
+                    <p className="step-content-desc">3분간 편안한 휴식을 취하며 인지적 피로도를 완화하고 기저 상태로 뇌파를 리셋하여 2차 측정을 준비합니다.</p>
                   </div>
                 </div>
 
                 <div className="protocol-step-card interaction">
                   <div className="step-time-badge">
                     <div className="step-time-title">STEP 04</div>
-                    <div className="step-time-duration">15:00 ~ 20:00 (5분)</div>
+                    <div className="step-time-duration">11:00 ~ 16:00 (5분)</div>
                   </div>
                   <div>
-                    <h4 className="step-content-title"><Sparkles size={20} style={{ color: 'var(--accent-amber)' }} /> 2차 심층 상호작용 및 정서 평가</h4>
-                    <p className="step-content-desc">깊은 공감대 형성 대화를 진행하고 설문 및 6대 정서 프로파일과 비교 검증합니다.</p>
+                    <h4 className="step-content-title"><Sparkles size={20} style={{ color: 'var(--accent-amber)' }} /> 2차 실험 측정 (심화 상호작용 및 정서 평가)</h4>
+                    <p className="step-content-desc">2차 과제(심층 대화 및 상호작용)를 진행하며 1차 실험 데이터와 뇌파 동조율 및 6대 정서 프로파일의 변화를 비교 검증합니다.</p>
                   </div>
                 </div>
               </div>
