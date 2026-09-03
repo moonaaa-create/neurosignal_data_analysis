@@ -159,14 +159,17 @@ export function calculateRAvoidance(af3A, af4A, af3B, af4B, threshold = -0.15) {
   return avoidanceCount / T;
 }
 
-// Continuous FAA Avoidance Penalty (Combines frequency + intensity with threshold)
-export function calculateContinuousAvoidancePenalty(af3A, af4A, af3B, af4B, wFaa = 0.25, threshold = -0.10) {
+// Bidirectional FAA Approach-Avoidance Balance (Approach Bonus + Avoidance Penalty)
+export function calculateContinuousFAABalance(af3A, af4A, af3B, af4B, wFaa = 0.25, avoidThreshold = -0.10, approachThreshold = 0.05) {
   const T = Math.min(af3A?.length || 0, af4A?.length || 0, af3B?.length || 0, af4B?.length || 0);
-  if (T === 0) return { rAvoidance: 0, penaltyFactor: 0, avgFaaA: 0, avgFaaB: 0 };
+  if (T === 0) return { rAvoidance: 0, rApproach: 0, netApproachRate: 0, avgFaaA: 0, avgFaaB: 0, faaMultiplier: 1.0, bonusOrPenaltyPct: 0 };
 
   let avoidanceCount = 0;
+  let approachCount = 0;
   let totalNegativeMagA = 0;
   let totalNegativeMagB = 0;
+  let totalPositiveMagA = 0;
+  let totalPositiveMagB = 0;
   let sumFaaA = 0;
   let sumFaaB = 0;
 
@@ -176,32 +179,65 @@ export function calculateContinuousAvoidancePenalty(af3A, af4A, af3B, af4B, wFaa
     sumFaaA += faaA;
     sumFaaB += faaB;
 
+    // Avoidance detection (Withdrawal, defense)
     let isAvoid = false;
-    if (faaA < threshold) {
+    if (faaA < avoidThreshold) {
       totalNegativeMagA += Math.abs(faaA);
       isAvoid = true;
     }
-    if (faaB < threshold) {
+    if (faaB < avoidThreshold) {
       totalNegativeMagB += Math.abs(faaB);
       isAvoid = true;
     }
     if (isAvoid) avoidanceCount++;
+
+    // Approach detection (Liking, positive engagement)
+    let isApproach = false;
+    if (faaA > approachThreshold) {
+      totalPositiveMagA += faaA;
+      isApproach = true;
+    }
+    if (faaB > approachThreshold) {
+      totalPositiveMagB += faaB;
+      isApproach = true;
+    }
+    if (isApproach) approachCount++;
   }
 
   const rAvoidance = avoidanceCount / T;
+  const rApproach = approachCount / T;
+  
   const avgNegativeIntensity = (totalNegativeMagA + totalNegativeMagB) / (2 * T);
-  const intensityPenalty = Math.log(1 + Math.exp(avgNegativeIntensity * 2)) * 0.5;
+  const avgPositiveIntensity = (totalPositiveMagA + totalPositiveMagB) / (2 * T);
 
-  // Composite avoidance penalty factor (0 to 1 scale, soft-clamped)
-  const penaltyFactor = Math.min(1.0, wFaa * (0.6 * rAvoidance + 0.4 * Math.min(1, intensityPenalty)));
+  // Net approach-avoidance score
+  const netApproachRate = rApproach - rAvoidance;
+
+  let faaModifier = 0;
+  if (netApproachRate >= 0) {
+    // Approach Bonus (up to +12%)
+    faaModifier = Math.min(0.12, wFaa * (0.6 * netApproachRate + 0.4 * Math.min(1, avgPositiveIntensity * 2)) * 0.35);
+  } else {
+    // Avoidance Penalty (up to -15%)
+    faaModifier = -Math.min(0.15, wFaa * (0.6 * Math.abs(netApproachRate) + 0.4 * Math.min(1, avgNegativeIntensity * 2)) * 0.40);
+  }
+
+  const faaMultiplier = Math.max(0.85, Math.min(1.15, 1 + faaModifier));
+  const bonusOrPenaltyPct = Math.round(faaModifier * 100 * 10) / 10;
 
   return {
     rAvoidance,
-    penaltyFactor,
+    rApproach,
+    netApproachRate,
+    faaMultiplier,
+    bonusOrPenaltyPct,
     avgFaaA: sumFaaA / T,
     avgFaaB: sumFaaB / T
   };
 }
+
+// Alias for legacy compatibility
+export const calculateContinuousAvoidancePenalty = calculateContinuousFAABalance;
 
 // Calculate Friendship Score (Legacy compatibility with neuro-calibration)
 export function calculateFriendshipScore(pGamma, rAvoidance, wSync = 1.0, wFaa = 0.25) {
@@ -214,11 +250,12 @@ export function calculateFriendshipScore(pGamma, rAvoidance, wSync = 1.0, wFaa =
 // ADVANCED TR-SEM v3.0 (Tri-Region Synchro-Emotional Model) SCORE
 // ================================================================
 export function calculateImprovedSyncScore({
-  multiGammaCorr, // Correlation of integrated/weighted gamma
   channelCorrs = {}, // { rPz, rT7, rT8 }
   channelWeights = { wPz: 0.4, wT7: 0.3, wT8: 0.3 },
+  faaMultiplier = 1.0,
   rAvoidance = 0,
-  avoidancePenalty = 0,
+  rApproach = 0,
+  bonusOrPenaltyPct = 0,
   emotionHarmony = 1.0,
   wSync = 0.80,
   wEmotion = 0.20
@@ -237,13 +274,12 @@ export function calculateImprovedSyncScore({
   // Weighted channel synchrony score (directly responsive to slider adjustments)
   const weightedChannelScore = (scorePz * normWPz) + (scoreT7 * normWT7) + (scoreT8 * normWT8);
 
-  // Avoidance discount (Max 15% reduction for natural preservation)
-  const discountFactor = Math.max(0.85, 1 - avoidancePenalty * 0.4);
-  const syncAfterAvoidance = weightedChannelScore * discountFactor;
+  // Bidirectional FAA Modulation: Approach Bonus (+) or Avoidance Deduction (-)
+  const syncAfterFaa = Math.min(100, Math.max(0, weightedChannelScore * faaMultiplier));
 
   // Multi-modal fusion with Emotional harmony (Cosine similarity, scaled 0~100)
   const emotionScore = Math.max(0, Math.min(100, emotionHarmony * 100));
-  const rawFinalScore = (wSync * syncAfterAvoidance + wEmotion * emotionScore);
+  const rawFinalScore = (wSync * syncAfterFaa + wEmotion * emotionScore);
 
   return {
     score: Math.max(0, Math.min(100, Math.round(rawFinalScore * 10) / 10)),
@@ -254,7 +290,10 @@ export function calculateImprovedSyncScore({
       t7: Math.round(scoreT7 * normWT7 * 10) / 10,
       t8: Math.round(scoreT8 * normWT8 * 10) / 10,
     },
-    syncAfterAvoidance,
+    syncAfterFaa,
+    syncAfterAvoidance: syncAfterFaa,
+    faaMultiplier,
+    bonusOrPenaltyPct,
     emotionScore
   };
 }

@@ -506,16 +506,17 @@ function App() {
     const emotionVecB = EMOTION_KEYS.map(e => emotionsB[e.label] || 50);
     const emotionHarmony = calculateCosineSimilarity(emotionVecA, emotionVecB);
 
-    // 6. Continuous Avoidance Penalty
-    const avoidanceResult = calculateContinuousAvoidancePenalty(pAF3A, pAF4A, pAF3B, pAF4B, wFaa);
+    // 6. Bidirectional FAA Approach-Avoidance Balance (Approach Bonus + Avoidance Deduction)
+    const faaResult = calculateContinuousFAABalance(activeAF3A, activeAF4A, activeAF3B, activeAF4B, wFaa);
     
-    // 7. Advanced TR-SEM v3.0 Final Score
+    // 7. Advanced TR-SEM v3.0 Final Score with FAA modulation
     const syncCalculation = calculateImprovedSyncScore({
-      multiGammaCorr: pGamma,
       channelCorrs: { rPz, rT7, rT8 },
       channelWeights: { wPz, wT7, wT8 },
-      rAvoidance: avoidanceResult.rAvoidance,
-      avoidancePenalty: avoidanceResult.penaltyFactor,
+      faaMultiplier: faaResult.faaMultiplier,
+      rAvoidance: faaResult.rAvoidance,
+      rApproach: faaResult.rApproach,
+      bonusOrPenaltyPct: faaResult.bonusOrPenaltyPct,
       emotionHarmony,
       wSync,
       wEmotion
@@ -547,15 +548,17 @@ function App() {
     // 8. 5-Minute Timeline & Moving Window Synchrony
     const timelineAnalysis = calculateTimeWindowSynchrony(integratedGammaA, integratedGammaB, 30, 5);
 
-    const discountPercent = Math.round((1 - (syncCalculation.syncAfterAvoidance / (syncCalculation.weightedChannelScore || 1))) * 100 * 10) / 10;
-
     setResults({
       score, titleStr, descStr, tierLevel, emotionsA, emotionsB,
-      pGamma, rAvoidance: avoidanceResult.rAvoidance, detectedLag,
-      avoidancePenalty: avoidanceResult.penaltyFactor,
-      avgFaaA: avoidanceResult.avgFaaA,
-      avgFaaB: avoidanceResult.avgFaaB,
-      discountPercent: discountPercent > 0 ? discountPercent : 0,
+      pGamma, 
+      rAvoidance: faaResult.rAvoidance, 
+      rApproach: faaResult.rApproach,
+      netApproachRate: faaResult.netApproachRate,
+      faaMultiplier: faaResult.faaMultiplier,
+      bonusOrPenaltyPct: faaResult.bonusOrPenaltyPct,
+      avgFaaA: faaResult.avgFaaA,
+      avgFaaB: faaResult.avgFaaB,
+      discountPercent: faaResult.bonusOrPenaltyPct,
       emotionHarmony,
       channelCorrs: { rPz, rT7, rT8 },
       weights: { wPz, wT7, wT8 },
@@ -1085,55 +1088,53 @@ function App() {
                   </div>
                 </div>
 
-                {/* FAA FRONTAL AVOIDANCE & DEFENSE ANALYSIS PANEL */}
+                {/* FAA FRONTAL APPROACH-AVOIDANCE BALANCE PANEL */}
                 <div className="faa-analysis-card">
                   <div className="faa-header">
                     <div className="faa-title-wrap">
                       <ShieldCheck size={22} className="faa-icon" />
                       <div>
-                        <h3 className="faa-title">🛡️ 전두엽 회피 반응 & 심리적 방어 지표 (FAA Avoidance Index)</h3>
-                        <p className="faa-subtitle">전두엽 알파파 비대칭(FAA = ln AF4 - ln AF3)을 통한 무의식적 긴장·방어 기제 실시간 탐지</p>
+                        <h3 className="faa-title">🛡️ 전두엽 정서 접근-회피 밸런스 (FAA Approach-Avoidance Index)</h3>
+                        <p className="faa-subtitle">전두엽 알파파 비대칭(FAA = ln AF4 - ln AF3)을 통한 호감/접근 보너스(+) 및 회피/경계 감점(-) 실시간 평가</p>
                       </div>
                     </div>
-                    <div className={`faa-badge ${results.rAvoidance < 0.15 ? 'safe' : results.rAvoidance < 0.30 ? 'warn' : 'danger'}`}>
-                      {results.rAvoidance < 0.15 ? '🟢 열린 수용 상태 (Open & Receptive)' : results.rAvoidance < 0.30 ? '🟡 완만한 경계 탐색 (Vigilant)' : '🔴 방어적 회피 우세 (Defensive)'}
+                    <div className={`faa-badge ${results.bonusOrPenaltyPct > 0 ? 'safe' : results.bonusOrPenaltyPct === 0 ? 'warn' : 'danger'}`}>
+                      {results.bonusOrPenaltyPct > 0 ? '🟢 긍정 호감·접근 우세 (+보너스 가산 ✨)' : results.bonusOrPenaltyPct === 0 ? '⚪ 중립 안정 상태 (Neutral)' : '🔴 방어적 회피 우세 (-감점 적용)'}
                     </div>
                   </div>
 
                   <div className="faa-metrics-grid">
                     <div className="faa-metric-box">
-                      <span className="faa-metric-label">전두엽 회피율 (R_Avoidance)</span>
-                      <span className="faa-metric-value">{Math.round(results.rAvoidance * 100)}%</span>
-                      <span className="faa-metric-desc">전체 {results.totalDurationSec || 300}초 중 {Math.round(results.rAvoidance * (results.totalDurationSec || 300))}초간 회피 편향 감지</span>
+                      <span className="faa-metric-label">🟢 긍정 호감·접근율 (R_Approach)</span>
+                      <span className="faa-metric-value positive">{Math.round((results.rApproach || 0) * 100)}%</span>
+                      <span className="faa-metric-desc">호감·긍정 정서 관여 (FAA &gt; +0.05)</span>
                     </div>
 
                     <div className="faa-metric-box">
-                      <span className="faa-metric-label">👤 {nameA}님 평균 FAA</span>
+                      <span className="faa-metric-label">🔴 무의식 회피·방어율 (R_Avoidance)</span>
+                      <span className="faa-metric-value negative">{Math.round((results.rAvoidance || 0) * 100)}%</span>
+                      <span className="faa-metric-desc">경계·심리적 긴장 (FAA &lt; -0.10)</span>
+                    </div>
+
+                    <div className="faa-metric-box">
+                      <span className="faa-metric-label">👥 2인 평균 FAA 동기 지수</span>
                       <span className={`faa-metric-value ${results.avgFaaA !== undefined && results.avgFaaA >= 0 ? 'positive' : 'negative'}`}>
-                        {results.avgFaaA !== undefined ? (results.avgFaaA >= 0 ? `+${results.avgFaaA.toFixed(3)}` : results.avgFaaA.toFixed(3)) : '0.00'}
+                        A: {results.avgFaaA !== undefined ? (results.avgFaaA >= 0 ? `+${results.avgFaaA.toFixed(2)}` : results.avgFaaA.toFixed(2)) : '0.00'} | B: {results.avgFaaB !== undefined ? (results.avgFaaB >= 0 ? `+${results.avgFaaB.toFixed(2)}` : results.avgFaaB.toFixed(2)) : '0.00'}
                       </span>
-                      <span className="faa-metric-desc">{results.avgFaaA !== undefined && results.avgFaaA >= 0 ? '긍정 접근·호감 동기 우세 🟢' : '신중·회피 모드 편향 🔴'}</span>
+                      <span className="faa-metric-desc">{results.avgFaaA >= 0 && results.avgFaaB >= 0 ? '두 참여자 모두 접근·호감 우세 🟢' : '순간적 긴장 혼재 🟡'}</span>
                     </div>
 
                     <div className="faa-metric-box">
-                      <span className="faa-metric-label">👤 {nameB}님 평균 FAA</span>
-                      <span className={`faa-metric-value ${results.avgFaaB !== undefined && results.avgFaaB >= 0 ? 'positive' : 'negative'}`}>
-                        {results.avgFaaB !== undefined ? (results.avgFaaB >= 0 ? `+${results.avgFaaB.toFixed(3)}` : results.avgFaaB.toFixed(3)) : '0.00'}
+                      <span className="faa-metric-label">✨ 최종 FAA 점수 보정 효과</span>
+                      <span className={`faa-metric-value ${results.bonusOrPenaltyPct >= 0 ? 'positive' : 'discount'}`}>
+                        {results.bonusOrPenaltyPct > 0 ? `+${results.bonusOrPenaltyPct}% (보너스 ✨)` : results.bonusOrPenaltyPct === 0 ? '0% (무보정)' : `${results.bonusOrPenaltyPct}% (감점)`}
                       </span>
-                      <span className="faa-metric-desc">{results.avgFaaB !== undefined && results.avgFaaB >= 0 ? '긍정 접근·호감 동기 우세 🟢' : '신중·회피 모드 편향 🔴'}</span>
-                    </div>
-
-                    <div className="faa-metric-box">
-                      <span className="faa-metric-label">최종 점수 감점 (Discount)</span>
-                      <span className="faa-metric-value discount">
-                        {results.discountPercent > 0 ? `-${results.discountPercent}%` : '0% (무감점)'}
-                      </span>
-                      <span className="faa-metric-desc">{results.discountPercent > 0 ? `회피 패널티로 -${results.discountPercent}% 감점 적용` : '감점 없음 (동조율 100% 보존)'}</span>
+                      <span className="faa-metric-desc">{results.bonusOrPenaltyPct > 0 ? '호감 보너스로 동기화 점수 추가 가산' : results.bonusOrPenaltyPct === 0 ? '보너스/감점 없음' : '회피 패널티 할인율 적용'}</span>
                     </div>
                   </div>
 
                   <div className="faa-formula-footer">
-                    📐 <strong>FAA 산출 원리</strong>: FAA = ln(AF4_alpha) - ln(AF3_alpha) ➔ 양수(+)는 좌측 전두엽 활성(접근/긍정 호감), 음수(-)는 우측 전두엽 활성(회피/방어적 긴장)을 의미합니다. (임계값 FAA &lt; -0.10 발생 빈도로 회피율 산출)
+                    📐 <strong>양방향 FAA 산출 원리</strong>: FAA = ln(AF4_alpha) - ln(AF3_alpha) ➔ <strong>양수(+)는 좌측 전두엽 활성(호감·접근 보너스 가산)</strong>, <strong>음수(-)는 우측 전두엽 활성(회피·방어 감점)</strong>을 부여하여 보다 공정하고 정확한 상호작용 점수를 도출합니다.
                   </div>
                 </div>
 
