@@ -108,26 +108,40 @@ function sampleData(arr, maxPoints = 300) {
 
 function getParticipantPersona(top1, top2) {
   if (!top1 || !top2) return { icon: '✨', badge: '정서 탐구자', tag: '균형 정서형', desc: '다채로운 정서 리듬을 보여줍니다.' };
-  const n1 = top1.label.split(' ')[0];
-  const n2 = top2.label.split(' ')[0];
+  const str = `${top1.label} ${top2.label}`.toLowerCase();
   
-  if (n1 === '집중' || n2 === '집중') {
-    if (n1 === '몰입' || n2 === '몰입') return { icon: '🎯', badge: '딥 포커스 탐구러', tag: '초집중 몰입형', desc: '상대방의 모든 말과 장면에 온 신경을 집중하는 몰입형 리스너' };
-    if (n1 === '흥미' || n2 === '흥미') return { icon: '💡', badge: '호기심 천재 브레인', tag: '지적 탐구형', desc: '새로운 이야기와 지적 자극에 적극적으로 반응하는 탐험가' };
-    if (n1 === '이완' || n2 === '이완') return { icon: '🧘', badge: '차분한 관찰형 전략가', tag: '안정 집중형', desc: '흔들림 없이 편안한 태도로 맥락을 꿰뚫어 보는 타입' };
+  const hasFocus = str.includes('집중') || str.includes('focus');
+  const hasEngage = str.includes('몰입') || str.includes('engagement');
+  const hasInterest = str.includes('흥미') || str.includes('interest');
+  const hasExcite = str.includes('흥분') || str.includes('excitement');
+  const hasRelax = str.includes('이완') || str.includes('relaxation');
+  const hasStress = str.includes('스트레스') || str.includes('stress');
+
+  if (hasEngage && hasInterest) {
+    return { icon: '💡', badge: '호기심 만렙 몰입러', tag: '지적 탐구 & 몰입형', desc: '새로운 이야기와 장면에 눈을 반짝이며 적극적으로 빠져드는 타입' };
   }
-  if (n1 === '흥분' || n2 === '흥분') {
-    if (n1 === '흥미' || n2 === '흥미') return { icon: '⚡', badge: '열정 리액션 폭격기', tag: '스파크 에너지형', desc: '상대방의 멘트에 즉각 텐션을 올리며 분위기를 주도하는 에너자이저' };
-    if (n1 === '몰입' || n2 === '몰입') return { icon: '🔥', badge: '진심 공감 에너자이저', tag: '정서 감응형', desc: '감정의 파동에 온전히 빠져들어 깊게 함께 느끼는 찐공감러' };
+  if (hasEngage && hasFocus) {
+    return { icon: '🎯', badge: '딥 포커스 탐구러', tag: '초집중 몰입형', desc: '상대방의 모든 말과 장면에 온 신경을 집중하는 몰입형 리스너' };
   }
-  if (n1 === '이완' || n2 === '이완') {
-    if (n1 === '흥미' || n2 === '흥미') return { icon: '☕', badge: '힐링 무드 메이커', tag: '여유 탐색형', desc: '부드럽고 편안한 분위기 속에서 상대방의 마음을 여는 힐러' };
-    if (n1 === '몰입' || n2 === '몰입') return { icon: '🌿', badge: '온화한 소통 마스터', tag: '편안한 교감형', desc: '자연스러운 안정감으로 상대방에게 편안함을 선물하는 동행자' };
+  if (hasFocus && hasInterest) {
+    return { icon: '🧠', badge: '지적 호기심 브레인', tag: '지적 탐구형', desc: '새로운 정보와 깊이 있는 주제에 대해 예리하게 반응하는 탐험가' };
   }
-  if (n1 === '스트레스' || n2 === '스트레스') {
+  if (hasEngage && hasExcite) {
+    return { icon: '🔥', badge: '진심 공감 에너자이저', tag: '정서 감응형', desc: '감정의 파동에 온전히 빠져들어 깊게 함께 느끼는 찐공감러' };
+  }
+  if (hasInterest && hasExcite) {
+    return { icon: '⚡', badge: '열정 리액션 폭격기', tag: '스파크 에너지형', desc: '상대방의 멘트에 즉각 텐션을 올리며 분위기를 주도하는 에너자이저' };
+  }
+  if (hasRelax && (hasEngage || hasInterest)) {
+    return { icon: '☕', badge: '힐링 무드 메이커', tag: '여유 탐색형', desc: '부드럽고 편안한 분위기 속에서 상대방의 마음을 여는 힐러' };
+  }
+  if (hasFocus && hasRelax) {
+    return { icon: '🧘', badge: '차분한 관찰형 전략가', tag: '안정 집중형', desc: '흔들림 없이 편안한 태도로 전체 맥락을 꿰뚫어 보는 타입' };
+  }
+  if (hasStress) {
     return { icon: '🧗', badge: '섬세한 뇌파 완벽주의자', tag: '신중 관찰형', desc: '상황을 꼼꼼하게 살피며 신중하고 세심하게 소통하는 스타일' };
   }
-  return { icon: '✨', badge: `${n1}·${n2} 멀티 플레이어`, tag: '다채로운 정서형', desc: `${n1}과 ${n2} 지수가 두드러져 다채롭고 매력적인 뇌파 리듬을 보입니다.` };
+  return { icon: '✨', badge: `${top1.label.split(' ')[0]}·${top2.label.split(' ')[0]} 멀티 플레이어`, tag: '다채로운 정서형', desc: '다채롭고 매력적인 뇌파 리듬을 보여줍니다.' };
 }
 
 function App() {
